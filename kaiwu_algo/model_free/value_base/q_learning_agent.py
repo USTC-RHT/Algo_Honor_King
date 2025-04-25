@@ -1,6 +1,6 @@
 import numpy as np
-from sarsa_algo import Algo
-from sarsa_config import Config
+from q_learning_algo import Algo
+from q_learning_config import Config
 from dataclasses import dataclass
 
 @dataclass
@@ -9,9 +9,8 @@ class Data:
     action: int
     reward: float
     next_state: int
-    next_action: int
     done: bool
-
+    
 class Agent:
     def __init__(self,env_name):
         # 选择需要运行的环境
@@ -34,9 +33,9 @@ class Agent:
             action = np.argmax(self.Q_table[state])
         return action
 
-    def update(self,obs,action,r,next_obs,next_action,done):
+    def update(self,obs,action,r,next_obs,done):
         # 创建一个 Data 实例
-        list_sample_data = [Data(state=obs, action=action, reward=r, next_state=next_obs, next_action=next_action, done=done)]
+        list_sample_data = [Data(state=obs, action=action, reward=r, next_state=next_obs, done=done)]
         algo = Algo(self.Q_table,Config)
         algo.learn(list_sample_data)
     
