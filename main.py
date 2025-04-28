@@ -5,17 +5,27 @@ from tqdm import tqdm
 import os
 import sys
 cur_dir = os.path.dirname(__file__)
-root1 = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo", "model_free", "value_base"))
-root2 = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
-sys.path.append(root1)
-sys.path.append(root2)
+root = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
+sys.path.append(root)
+value_base_dir = os.path.join(root, "model_free", "value_base")
 
-algo_name = 'sarsa'
+
+algo_name = 'monte_carlo'
+# algo_name = 'sarsa'
 # algo_name = 'q_learning'
+if algo_name == 'monte_carlo':
+    root1 = os.path.abspath(os.path.join(value_base_dir, "monte_carlo"))
+    sys.path.append(root1)
+    from monte_carlo_config import Config
+    from monte_carlo_agent import Agent
 if algo_name == 'sarsa':
+    root1 = os.path.abspath(os.path.join(value_base_dir, "sarsa"))
+    sys.path.append(root1)
     from sarsa_config import Config
     from sarsa_agent import Agent
 if algo_name == 'q_learning':
+    root1 = os.path.abspath(os.path.join(value_base_dir, "q_learning"))
+    sys.path.append(root1)
     from q_learning_config import Config
     from q_learning_agent import Agent
 
@@ -32,17 +42,24 @@ for i in range(10):
             episode_return = 0
             obs, _ = env.reset()
             done = False
+            Episode = []
             while not done:
                 action = agent.take_action(obs)
                 next_obs, r, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
-                episode_return += r
+                episode_return += r 
+                if algo_name == 'monte_carlo':
+                    Episode.append((obs,action,r))      
                 if algo_name == 'sarsa':
                     next_action = agent.take_action(next_obs)
                     agent.update(obs,action,r,next_obs,next_action,done)                
                 if algo_name == 'q_learning':
                     agent.update(obs,action,r,next_obs,done)
                 obs = next_obs
+            if algo_name == 'monte_carlo':
+            #     if len(Episode) > 1:
+            #         print('1')
+                agent.update(Episode)
             return_list.append(episode_return)
             if (i_episode + 1) % 10 == 0:
                 pbar.set_postfix({'episode':'%d' % (Config.num_episodes / 10 * i + i_episode + 1),'return': '%.3f' % np.mean(return_list)})
