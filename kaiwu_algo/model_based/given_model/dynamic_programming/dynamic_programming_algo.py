@@ -25,7 +25,6 @@ class Algo(BaseAlgo):
 
     def learn(self):
         """
-        
         """
         assert self.algo_name in ["value_iteration", "policy_iteration"], "Invalid algorithm"
 
@@ -66,7 +65,57 @@ class Algo(BaseAlgo):
 
 
     def policy_iteration(self):
-        pass
+        iteration_num = 0
+        while iteration_num < self.max_iter_num:
+            pre_policy = np.copy(self.policy)
+            self.policy_evaluation(pre_policy)
+            new_policy = self.policy_improvement()
+
+            self.policy[:] = new_policy[:]
+
+            if np.allclose(pre_policy, new_policy, atol=1e-4):
+                break
+
+            if iteration_num % 10 == 0:
+                print("Iteration {}".format(iteration_num))
+            iteration_num += 1
+        return 
+
+
+    def policy_evaluation(self,policy):
+        # 初始化状态价值表
+        self.value = np.zeros(self.state_size)
+        delta = self.theta + 1
+
+        while delta > self.theta:
+            delta = 0
+            # 遍历所有状态
+            for state in range(self.state_size):
+                v = 0
+                # 遍历给定状态的所有动作
+                for action in range(self.action_size):
+                    v += policy[state][action] * self.get_action_value(state, action)
+
+                # 计算给定状态的旧值和新值之间的差值
+                delta = max(delta, abs(v - self.value[state]))
+
+                # 更新状态价值表
+                self.value[state] = v
+        return
+
+    def policy_improvement(self):
+        policy = np.ones((self.state_size,self.action_size)) / self.action_size
+        for state in range(self.state_size):
+            action_value_list = []
+            for action in range(self.action_size):
+                action_value_list.append(self.get_action_value(state, action))
+        
+            action_value_list = np.array(action_value_list)
+            # policy update
+            argmax_index = int(np.argmax(action_value_list))
+            policy[state] = np.zeros(self.action_size)
+            policy[state][argmax_index] = 1
+        return policy
 
 
 

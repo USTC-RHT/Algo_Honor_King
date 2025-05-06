@@ -67,10 +67,9 @@ class Agent:
         return np.argmax(self.policy[state])
 
     def update(self):
-        
         algo = Algo([self.trans_state_prob,self.trans_reward_prob,self.policy,self.value],Config)
         algo.learn()
-    
+
     def best_action(self,state):
         return np.argmax(self.policy[state])
     
