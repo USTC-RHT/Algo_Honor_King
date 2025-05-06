@@ -9,10 +9,10 @@ root = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
 sys.path.append(root)
 value_base_dir = os.path.join(root, "model_free", "value_base")
 
-
 algo_name = 'monte_carlo'
 # algo_name = 'sarsa'
 # algo_name = 'q_learning'
+
 if algo_name == 'monte_carlo':
     root1 = os.path.abspath(os.path.join(value_base_dir, "monte_carlo"))
     sys.path.append(root1)
@@ -30,7 +30,6 @@ if algo_name == 'q_learning':
     from q_learning_agent import Agent
 
 
-# agent = Sarsa(n_row,n_col,epsilon,alpha,gamma,n_action)
 env_name = "CliffWalking-v0"    # "FrozenLake-v1"
 env = gym.make(env_name)
 agent = Agent(env_name)
@@ -57,13 +56,12 @@ for i in range(10):
                     agent.update(obs,action,r,next_obs,done)
                 obs = next_obs
             if algo_name == 'monte_carlo':
-            #     if len(Episode) > 1:
-            #         print('1')
                 agent.update(Episode)
             return_list.append(episode_return)
             if (i_episode + 1) % 10 == 0:
                 pbar.set_postfix({'episode':'%d' % (Config.num_episodes / 10 * i + i_episode + 1),'return': '%.3f' % np.mean(return_list)})
             pbar.update(1)
+
 
 env = gym.make(env_name,render_mode = 'human')
 obs, _ = env.reset()

@@ -6,7 +6,7 @@ class Algo(BaseAlgo):
         self.config = config                             # 配置文件
         self.gamma = config.gamma                        # 折扣因子
         self.Q = model[0]                                # 在这里模型 model包含 Q值表与访问次数(visit)表，在智能体中定义
-        self.visit = model[1]     
+        self.visit = model[1]                            # Q值表与访问次数表为二维矩阵,两个维度分别对应状态和动作
 
 
     def learn(self, list_sample_data):
