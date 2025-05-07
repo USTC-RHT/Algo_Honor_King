@@ -24,8 +24,6 @@ class Algo(BaseAlgo):
         
 
     def learn(self):
-        """
-        """
         assert self.algo_name in ["value_iteration", "policy_iteration"], "Invalid algorithm"
 
         if self.algo_name == "value_iteration":
