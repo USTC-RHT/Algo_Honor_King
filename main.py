@@ -8,10 +8,13 @@ cur_dir = os.path.dirname(__file__)
 root = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
 sys.path.append(root)
 value_base_dir = os.path.join(root, "model_free", "value_base")
+policy_base_dir = os.path.join(root, "model_free", "policy_base")
 
-algo_name = 'monte_carlo'
+# algo_name = 'monte_carlo'
 # algo_name = 'sarsa'
 # algo_name = 'q_learning'
+algo_name = 'reinforce'
+
 
 if algo_name == 'monte_carlo':
     root1 = os.path.abspath(os.path.join(value_base_dir, "monte_carlo"))
@@ -28,11 +31,19 @@ if algo_name == 'q_learning':
     sys.path.append(root1)
     from q_learning_config import Config
     from q_learning_agent import Agent
+if algo_name == 'reinforce':
+    root1 = os.path.abspath(os.path.join(policy_base_dir, "reinforce"))
+    sys.path.append(root1)
+    from reinforce_config import Config
+    from reinforce_agent import Agent
 
-
-env_name = "CliffWalking-v0"    # "FrozenLake-v1"
+# env_name = "CliffWalking-v0"    # "FrozenLake-v1"
+env_name = "CartPole-v0"
 env = gym.make(env_name)
-agent = Agent(env_name)
+if algo_name == 'reinforce':
+    agent = Agent(env)
+else:
+    agent = Agent(env_name)
 
 return_list = []
 for i in range(10):
@@ -47,7 +58,7 @@ for i in range(10):
                 next_obs, r, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
                 episode_return += r 
-                if algo_name == 'monte_carlo':
+                if algo_name == 'monte_carlo' or 'reinforce':
                     Episode.append((obs,action,r))      
                 if algo_name == 'sarsa':
                     next_action = agent.take_action(next_obs)
@@ -55,11 +66,16 @@ for i in range(10):
                 if algo_name == 'q_learning':
                     agent.update(obs,action,r,next_obs,done)
                 obs = next_obs
-            if algo_name == 'monte_carlo':
+            if algo_name == 'monte_carlo' or 'reinforce':
                 agent.update(Episode)
             return_list.append(episode_return)
             if (i_episode + 1) % 10 == 0:
-                pbar.set_postfix({'episode':'%d' % (Config.num_episodes / 10 * i + i_episode + 1),'return': '%.3f' % np.mean(return_list)})
+                                pbar.set_postfix({
+                    'episode':
+                    '%d' % (Config.num_episodes / 10 * i + i_episode + 1),
+                    'return':
+                    '%.3f' % np.mean(return_list[-10:])
+                })
             pbar.update(1)
 
 
