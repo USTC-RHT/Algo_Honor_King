@@ -30,10 +30,7 @@ class Algo(BaseAlgo):
         state, action, reward = sample.state, sample.action, sample.reward 
         next_state, done = sample.next_state, sample.done
 
-        if done:
-            td_target = reward
-        else:
-            td_target = reward + self.gamma * np.max(self.Q[next_state, :])
+        td_target = reward + self.gamma * np.max(self.Q[next_state, :]) * (1 - done)
         
         td_error = td_target - self.Q[state, action]
         self.Q[state, action] += self.learning_rate * td_error

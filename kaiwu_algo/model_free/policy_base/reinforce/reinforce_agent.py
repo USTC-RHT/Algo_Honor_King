@@ -42,9 +42,6 @@ class Agent:
 
     def take_action(self,state):
         s = torch.tensor(state).view(1, self.state_dim).to(self.device)
-        # action_prob = self.model(s).detach().cpu().numpy().flatten()
-        # action = np.random.choice(len(action_prob), p=action_prob)
-        # return action
         action_dist = torch.distributions.Categorical(self.model(s))
         action = action_dist.sample()
         return action.item()
