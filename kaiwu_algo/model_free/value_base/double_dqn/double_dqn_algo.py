@@ -17,7 +17,7 @@ class Algo(BaseAlgo):
 
     def learn(self, list_sample_data):
         """
-        Deep Q-learning(DQN)
+        Double Deep Q-learning(Double DQN)
         - list_sample_data是从回放池中采样得到的样本集合(batch):{(s,a,r,s')} -> 以列表形式
         - 用目标网络(target network)计算目标值: target_q_value = r + gamma * max q(s',a',w_T)
         其中：
@@ -46,12 +46,12 @@ class Algo(BaseAlgo):
 
         actions, rewards, next_states, dones = zip(*[(sample_data.action, sample_data.reward, sample_data.next_state,
                                                       int(sample_data.done)) for sample_data in list_sample_data])
-        rewards = torch.tensor(rewards,device=self.device)
-        next_states = np.array(next_states)
-        dones = torch.tensor(dones,device=self.device)
+        rewards = torch.tensor(rewards).to(self.device)
+        dones = torch.tensor(dones).to(self.device)
+        
         main_q_values = model_output_data[np.arange(len(actions)),actions]
-        next_state_tensor = torch.tensor(next_states,device=self.device)
-        max_q_values = torch.max(self.Q_target.forward(next_state_tensor), dim=1).values
+        next_state_tensor = torch.tensor(next_states).to(self.device)
+        max_q_values = torch.max(self.Q_target.forward(next_state_tensor).detach(), dim=1).values
         target_q_values = rewards + self.gamma * max_q_values * (1 - dones)
         loss += F.mse_loss(main_q_values,target_q_values)
         return loss
