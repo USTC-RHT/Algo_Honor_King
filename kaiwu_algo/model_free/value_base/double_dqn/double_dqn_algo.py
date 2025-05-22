@@ -19,11 +19,16 @@ class Algo(BaseAlgo):
         """
         Double Deep Q-learning(Double DQN)
         - list_sample_data是从回放池中采样得到的样本集合(batch):{(s,a,r,s')} -> 以列表形式
-        - 用目标网络(target network)计算目标值: target_q_value = r + gamma * max q(s',a',w_T)
+        - 用训练网络(main network)选取动作:
+        a* = argmax q(s',a',w)
+
+        - 用目标网络(target network)计算目标值: 
+        target_q_value = r + gamma * q(s',a*,w_T)
         其中：
         r 表示R(s,a),即在状态s下采取动作a所获得的奖励
         gamma 是折扣因子, 用于平衡当前奖励和未来奖励的重要性
-        max q(s',a',w_T) 表示在新状态s'下采取所有可能动作a'的最大Q值,用目标网络w_T计算
+        a* 表示在新状态s'下Q值最大的动作, 用训练网络w计算
+        q(s',a*,w_T) 表示在新状态s'下采取动作a*的Q值, 用目标网络w_T计算
         """
         self.sample_data_check(list_sample_data)    # 检查样本字段是否符合要求
 
@@ -46,13 +51,16 @@ class Algo(BaseAlgo):
 
         actions, rewards, next_states, dones = zip(*[(sample_data.action, sample_data.reward, sample_data.next_state,
                                                       int(sample_data.done)) for sample_data in list_sample_data])
-        rewards = torch.tensor(rewards).to(self.device)
-        dones = torch.tensor(dones).to(self.device)
-        
+        rewards = torch.tensor(rewards,device=self.device)
+        next_states = np.array(next_states)
+        next_states_tensor = torch.tensor(next_states,device=self.device)
+        dones = torch.tensor(dones,device=self.device)
+
         main_q_values = model_output_data[np.arange(len(actions)),actions]
-        next_state_tensor = torch.tensor(next_states).to(self.device)
-        max_q_values = torch.max(self.Q_target.forward(next_state_tensor).detach(), dim=1).values
-        target_q_values = rewards + self.gamma * max_q_values * (1 - dones)
+
+        max_actions = torch.max(self.Q_main.forward(next_states_tensor), dim=1).indices
+        max_q_values = self.Q_target.forward(next_states_tensor).gather(1, max_actions.unsqueeze(1))
+        target_q_values = rewards + self.gamma * max_q_values.squeeze() * (1 - dones)
         loss += F.mse_loss(main_q_values,target_q_values)
         return loss
     
