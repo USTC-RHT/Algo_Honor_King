@@ -10,7 +10,8 @@ sys.path.append(root)
 value_base_dir = os.path.join(root, "model_free", "value_base")
 
 # algo_name = 'dqn'
-algo_name = 'double_dqn'
+# algo_name = 'double_dqn'
+algo_name = 'dueling_dqn'
 
 if algo_name == 'dqn':
     root1 = os.path.abspath(os.path.join(value_base_dir, "dqn"))
@@ -22,8 +23,14 @@ elif algo_name == 'double_dqn':
     sys.path.append(root1)
     from double_dqn_config import Config
     from double_dqn_agent import Agent,ReplayBuffer
+elif algo_name == 'dueling_dqn':
+    root1 = os.path.abspath(os.path.join(value_base_dir, "dueling_dqn"))
+    sys.path.append(root1)
+    from dueling_dqn_config import Config
+    from dueling_dqn_agent import Agent,ReplayBuffer
 
 # env_name = "CliffWalking-v0"    # "FrozenLake-v1"
+# env_name = 'Pendulum-v1'
 env_name = "CartPole-v0"
 env = gym.make(env_name)
 

@@ -56,7 +56,7 @@ class Q_Net(torch.nn.Module):
 class Agent:
     def __init__(self,env):
         torch.manual_seed(0)
-        self.device = 'cuda'
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.state_dim = env.observation_space.shape[0]
         self.hidden_dim = 128
         self.action_dim = env.action_space.n

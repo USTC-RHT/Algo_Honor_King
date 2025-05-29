@@ -36,7 +36,7 @@ class Agent:
         self.hidden_dim = 128
         self.action_dim = env.action_space.n
         self.learning_rate = 1e-3
-        self.device = 'cuda'
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.model = PolicyNet(self.state_dim,self.hidden_dim,self.action_dim).to(self.device)
         self.optimizer = torch.optim.Adam(params=self.model.parameters(), lr = self.learning_rate)
 

@@ -1,6 +1,6 @@
 import numpy as np
-from double_dqn_algo import Algo
-from double_dqn_config import Config
+from dueling_dqn_algo import Algo
+from dueling_dqn_config import Config
 from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
@@ -37,22 +37,27 @@ class ReplayBuffer():
     def size(self):  # 目前buffer中数据的数量
         return len(self.buffer)
 
-
-class Q_Net(torch.nn.Module):
+class VAnet(torch.nn.Module):
+    ''' 只有一层隐藏层的A(Advantage)网络和V(Value)网络 '''
     def __init__(self, state_dim, hidden_dim, action_dim):
-        super(Q_Net, self).__init__()
-        self.fc1 = torch.nn.Linear(state_dim, hidden_dim)
-        self.fc2 = torch.nn.Linear(hidden_dim, action_dim)
+        super(VAnet, self).__init__()
+        self.fc1 = torch.nn.Linear(state_dim, hidden_dim)  # 共享网络部分
+        self.fc_A = torch.nn.Linear(hidden_dim, action_dim)
+        self.fc_V = torch.nn.Linear(hidden_dim, 1)
 
     def forward(self, x):
-        x = F.relu(self.fc1(x))  # 隐藏层使用ReLU激活函数
-        return self.fc2(x)
+        A = self.fc_A(F.relu(self.fc1(x)))
+        V = self.fc_V(F.relu(self.fc1(x)))
+        # 需要减去Advantage的最大值或均值，否则公式具有不唯一性 Q = V + A
+        # 优势函数只需跟随均值变化，不用频繁补偿最优动作的变化，让优化过程更加稳定
+        Q = V + A - A.mean()              # Q值由V值和A值计算得到
+        return Q
     
     def transform_sample_data(self, list_sample_data, device):
         State = [sample_data.state for sample_data in list_sample_data]
         tensor_state = torch.tensor(np.stack(State)).to(device)  
         return tensor_state
-        
+
 class Agent:
     def __init__(self,env):
         torch.manual_seed(0)
@@ -60,9 +65,10 @@ class Agent:
         self.state_dim = env.observation_space.shape[0]
         self.hidden_dim = 128
         self.action_dim = env.action_space.n
+        # self.action_dim = env.action_space.shape[0]
         self.learning_rate = Config.learning_rate
-        self.Q_main = Q_Net(self.state_dim,self.hidden_dim,self.action_dim).to(self.device)
-        self.Q_target = Q_Net(self.state_dim,self.hidden_dim,self.action_dim).to(self.device)
+        self.Q_main = VAnet(self.state_dim,self.hidden_dim,self.action_dim).to(self.device)
+        self.Q_target = VAnet(self.state_dim,self.hidden_dim,self.action_dim).to(self.device)
         self.Q_target.load_state_dict(self.Q_main.state_dict())
         self.model = [self.Q_main,self.Q_target]
         self.epsilon = Config.epsilon

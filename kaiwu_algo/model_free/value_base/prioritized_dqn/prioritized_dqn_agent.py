@@ -1,6 +1,6 @@
 import numpy as np
-from double_dqn_algo import Algo
-from double_dqn_config import Config
+from prioritized_dqn_algo import Algo
+from prioritized_dqn_config import Config
 from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
@@ -16,7 +16,7 @@ class SampleData:
     done: bool
 
 # ReplayBuffer, PrioritizedReplayBuffer
-class ReplayBuffer():
+class PrioritizedReplayBuffer():
     
     ''' 经验回放池 
         Max number of transitions to store in the buffer. 
