@@ -15,7 +15,7 @@ class Algo(BaseAlgo):
         self.Q_target = model[1].to(self.device)         # 目标神经网络                          
         self.train_step = 0
 
-    def learn(self, list_sample_data):
+    def learn(self, list_sample_data, weights):
         """
         Deep Q-learning(DQN)
         - list_sample_data是从回放池中采样得到的样本集合(batch):{(s,a,r,s')} -> 以列表形式
@@ -25,6 +25,7 @@ class Algo(BaseAlgo):
         gamma 是折扣因子, 用于平衡当前奖励和未来奖励的重要性
         max q(s',a',w_T) 表示在新状态s'下采取所有可能动作a'的最大Q值,用目标网络w_T计算
         """
+        self.weights = torch.tensor(weights).to(self.device).to(torch.float64)
         self.sample_data_check(list_sample_data)    # 检查样本字段是否符合要求
 
         # model_input_data是一个形状为(batch_size, state_dim)的 tensor
@@ -33,16 +34,16 @@ class Algo(BaseAlgo):
         # model_output_data是一个形状为(batch_size, action_dim)的 tensor,是主神经网络的输出
         model_output_data = self.Q_main.forward(model_input_data)				    # 模型推理
         self.optimizer.zero_grad()					                                # 清空梯度
-        loss = self.calculate_loss(list_sample_data, model_output_data)	            # 计算loss
+        loss, td_errors = self.calculate_loss(list_sample_data, model_output_data)	            # 计算loss
         loss.backward()													            # 计算梯度
         self.optimizer.step()						                                # 更新模型
 
         if self.train_step % self.config.target_network_update_freq == 0:
             self.Q_target.load_state_dict(self.Q_main.state_dict())                 # 更新目标网络
         self.train_step += 1                                                        # 更新计数器
+        return td_errors
     
     def calculate_loss(self,list_sample_data, model_output_data):
-        loss = 0
 
         actions, rewards, next_states, dones = zip(*[(sample_data.action, sample_data.reward, sample_data.next_state,
                                                       int(sample_data.done)) for sample_data in list_sample_data])
@@ -55,8 +56,10 @@ class Algo(BaseAlgo):
 
         max_q_values = torch.max(self.Q_target.forward(next_states_tensor), dim=1).values
         target_q_values = rewards + self.gamma * max_q_values * (1 - dones)
-        loss += F.mse_loss(main_q_values,target_q_values)
-        return loss
+        td_errors = (target_q_values - main_q_values).cpu().detach().numpy()
+        losses = F.mse_loss(main_q_values, target_q_values, reduction='none').to(torch.float64)  # 逐元素计算
+        weighted_loss = losses @ self.weights  # 对每个元素乘以相应的权重  
+        return weighted_loss, td_errors
     
     def sample_data_check(self,list_sample_data):
         if not isinstance(list_sample_data, list):

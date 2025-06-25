@@ -7,3 +7,6 @@ class Config:
     buffer_size = 10000
     minimal_size = 500
     batch_size = 64
+    alpha = 0.6
+    beta = 0.4
+    prioritized_replay_eps = 1e-6
