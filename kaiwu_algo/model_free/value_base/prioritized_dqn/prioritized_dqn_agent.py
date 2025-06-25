@@ -82,7 +82,6 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         self._max_priority = 1.0
 
     def add(self, state, action, reward, next_state, done):
-        """See ReplayBuffer.store_effect"""
         idx = self._next_idx
         super().add(state, action, reward, next_state, done)
         self._it_sum[idx] = self._max_priority ** self._alpha
