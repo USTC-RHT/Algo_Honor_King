@@ -26,7 +26,7 @@ class PolicyNet(torch.nn.Module):
         for sample_data in list_sample_data:
             State.append(sample_data.state)
             
-        tensor_state = torch.tensor(State).to(device)
+        tensor_state = torch.tensor(np.array(State)).to(device)
         return tensor_state
             
 class Agent:

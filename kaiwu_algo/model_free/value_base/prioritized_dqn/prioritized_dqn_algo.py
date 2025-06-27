@@ -34,7 +34,7 @@ class Algo(BaseAlgo):
         # model_output_data是一个形状为(batch_size, action_dim)的 tensor,是主神经网络的输出
         model_output_data = self.Q_main.forward(model_input_data)				    # 模型推理
         self.optimizer.zero_grad()					                                # 清空梯度
-        loss, td_errors = self.calculate_loss(list_sample_data, model_output_data)	            # 计算loss
+        loss, td_errors = self.calculate_loss(list_sample_data, model_output_data)	# 计算loss
         loss.backward()													            # 计算梯度
         self.optimizer.step()						                                # 更新模型
 
@@ -58,7 +58,7 @@ class Algo(BaseAlgo):
         target_q_values = rewards + self.gamma * max_q_values * (1 - dones)
         td_errors = (target_q_values - main_q_values).cpu().detach().numpy()
         losses = F.mse_loss(main_q_values, target_q_values, reduction='none').to(torch.float64)  # 逐元素计算
-        weighted_loss = losses @ self.weights  # 对每个元素乘以相应的权重  
+        weighted_loss = losses @ self.weights       # 对每个元素乘以相应的权重  
         return weighted_loss, td_errors
     
     def sample_data_check(self,list_sample_data):
