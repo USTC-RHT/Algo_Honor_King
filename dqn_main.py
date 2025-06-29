@@ -51,7 +51,8 @@ elif algo_name == 'noisy_dqn':
 # env_name = "CliffWalking-v0"    # "FrozenLake-v1"
 # env_name = 'Pendulum-v1'
 # env_name = "CartPole-v0"
-env_name = "CartPole-v1"
+# env_name = "CartPole-v1"
+env_name = 'LunarLander-v3'
 env = gym.make(env_name)
 eval_env = gym.make(env_name)
 # 设置随机数种子,提升训练的可复现性
