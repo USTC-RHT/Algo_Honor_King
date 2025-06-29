@@ -1,13 +1,22 @@
 import numpy as np
-from dueling_dqn_algo import Algo
-from dueling_dqn_config import Config
+from noisy_dqn_algo import Algo
+from noisy_dqn_config import Config
 from dataclasses import dataclass
 import copy
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import collections
 import random
+import sys
+import os
 
+cur_dir = os.path.dirname(__file__)
+root = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
+sys.path.append(root)
+from common.rl_utils import NoisyLinear
+
+# 数据类
 @dataclass
 class SampleData:
     state: int
@@ -16,7 +25,7 @@ class SampleData:
     next_state: int
     done: bool
 
-# ReplayBuffer, PrioritizedReplayBuffer
+# ReplayBuffer
 class ReplayBuffer():
     
     ''' 经验回放池 
@@ -38,46 +47,50 @@ class ReplayBuffer():
     def size(self):  # 目前buffer中数据的数量
         return len(self.buffer)
 
-class VAnet(torch.nn.Module):
-    ''' 只有一层隐藏层的A(Advantage)网络和V(Value)网络 '''
-    def __init__(self, state_dim, hidden_dim, action_dim):
-        super(VAnet, self).__init__()
-        self.fc1 = torch.nn.Linear(state_dim, hidden_dim)  # 共享网络部分
-        self.fc_A = torch.nn.Linear(hidden_dim, action_dim)
-        self.fc_V = torch.nn.Linear(hidden_dim, 1)
 
-    def forward(self, x):
-        A = self.fc_A(F.relu(self.fc1(x)))
-        V = self.fc_V(F.relu(self.fc1(x)))
-        # 需要减去Advantage的最大值或均值，否则公式具有不唯一性 Q = V + A
-        # 优势函数只需跟随均值变化，不用频繁补偿最优动作的变化，让优化过程更加稳定
-        Q = V + A - A.mean()              # Q值由V值和A值计算得到
-        return Q
-    
+# 构造神经网络
+def build_net(layer_shape, activation, output_activation):
+	'''Build networks with For loop'''
+	layers = []
+	for j in range(len(layer_shape)-1):
+		if j < len(layer_shape) - 2: layers += [nn.Linear(layer_shape[j], layer_shape[j+1]), activation()]
+		else: layers += [NoisyLinear(layer_shape[j], layer_shape[j+1], sigma_init=0.25), output_activation()]
+	return nn.Sequential(*layers)
+
+class Noisy_Q_Net(nn.Module):
+    def __init__(self, state_dim, hid_shape, action_dim):
+        super(Noisy_Q_Net, self).__init__()
+        layers = [state_dim] + list(hid_shape) + [action_dim]
+        self.Q = build_net(layers, nn.ReLU, nn.Identity)
+
+    def forward(self, s):
+        q = self.Q(s)
+        return q
+
     def transform_sample_data(self, list_sample_data, device):
         State = [sample_data.state for sample_data in list_sample_data]
         tensor_state = torch.tensor(np.stack(State)).to(device)  
         return tensor_state
 
+# 构造智能体       
 class Agent:
     def __init__(self,env):
         torch.manual_seed(0)
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.state_dim = env.observation_space.shape[0]
-        self.hidden_dim = 128
+        self.hidden_layers = Config.hidden_layers
         self.action_dim = env.action_space.n
-        # self.action_dim = env.action_space.shape[0]
         self.learning_rate = Config.learning_rate
-        self.Q_main = VAnet(self.state_dim,self.hidden_dim,self.action_dim).to(self.device)
+        self.Q_main = Noisy_Q_Net(self.state_dim,self.hidden_layers,self.action_dim).to(self.device)
         self.Q_target = copy.deepcopy(self.Q_main)
+        # Freeze target networks with respect to optimizers (only update via polyak averaging)
+        for p in self.Q_target.parameters(): p.requires_grad = False
         self.model = [self.Q_main,self.Q_target]
         self.epsilon = Config.epsilon
         self.optimizer = torch.optim.Adam(params=self.Q_main.parameters(), lr = self.learning_rate)
 
-    def take_action(self, state):  # epsilon-贪婪策略采取动作
-        if np.random.random() < self.epsilon:
-            action = np.random.randint(self.action_dim)
-        else:
+    def take_action(self, state):  # NoisyNet无需利用 epsilon-贪婪策略采取动作
+        with torch.no_grad():
             state_tensor = torch.tensor(state).to(self.device)
             action = self.Q_main(state_tensor).argmax().item()
         return action

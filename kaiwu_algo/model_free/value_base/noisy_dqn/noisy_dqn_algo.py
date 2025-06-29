@@ -8,6 +8,7 @@ class Algo(BaseAlgo):
         # 离散表格型强化学习算法 不需要神经网络与优化器
         self.config = config                             # 配置文件
         self.gamma = config.gamma                        # 折扣因子
+        self.tau = config.tau                            # 软更新系数
         self.device = device
         self.optimizer = optimizer
         # 模型 model代表拟合动作值Q的神经网络，在智能体中定义
@@ -17,18 +18,13 @@ class Algo(BaseAlgo):
 
     def learn(self, list_sample_data):
         """
-        Double Deep Q-learning(Double DQN)
+        Deep Q-learning(DQN)
         - list_sample_data是从回放池中采样得到的样本集合(batch):{(s,a,r,s')} -> 以列表形式
-        - 用训练网络(main network)选取动作:
-        a* = argmax q(s',a',w)
-
-        - 用目标网络(target network)计算目标值: 
-        target_q_value = r + gamma * q(s',a*,w_T)
+        - 用目标网络(target network)计算目标值: target_q_value = r + gamma * max q(s',a',w_T)
         其中：
         r 表示R(s,a),即在状态s下采取动作a所获得的奖励
         gamma 是折扣因子, 用于平衡当前奖励和未来奖励的重要性
-        a* 表示在新状态s'下Q值最大的动作, 用训练网络w计算
-        q(s',a*,w_T) 表示在新状态s'下采取动作a*的Q值, 用目标网络w_T计算
+        max q(s',a',w_T) 表示在新状态s'下采取所有可能动作a'的最大Q值,用目标网络w_T计算
         """
         self.sample_data_check(list_sample_data)    # 检查样本字段是否符合要求
 
@@ -42,10 +38,17 @@ class Algo(BaseAlgo):
         loss.backward()													            # 计算梯度
         self.optimizer.step()						                                # 更新模型
 
+        '''
         if self.train_step % self.config.target_network_update_freq == 0:
             self.Q_target.load_state_dict(self.Q_main.state_dict())                 # 更新目标网络
         self.train_step += 1                                                        # 更新计数器
-    
+        '''
+
+        # 采用软更新(Soft Update)方式:
+        for param, target_param in zip(self.Q_main.parameters(), self.Q_target.parameters()):
+            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        
+
     def calculate_loss(self,list_sample_data, model_output_data):
         loss = 0
 
@@ -58,9 +61,8 @@ class Algo(BaseAlgo):
 
         main_q_values = model_output_data[np.arange(len(actions)),actions]
         with torch.no_grad():
-            max_actions = torch.max(self.Q_main.forward(next_states_tensor), dim=1).indices
-            max_q_values = self.Q_target.forward(next_states_tensor).gather(1, max_actions.unsqueeze(1))
-            target_q_values = rewards + self.gamma * max_q_values.squeeze() * (1 - dones)
+            max_q_values = torch.max(self.Q_target.forward(next_states_tensor), dim=1).values
+            target_q_values = rewards + self.gamma * max_q_values * (1 - dones)
         loss += F.mse_loss(main_q_values,target_q_values)
         return loss
     

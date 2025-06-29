@@ -1,11 +1,13 @@
 import numpy as np
 from prioritized_dqn_algo import Algo
 from prioritized_dqn_config import Config
+import copy
 import sys
+import os
 
-# 文件夹地址
-upper_level_dir = 'E:\\Algo\\kaiwu_algo'
-sys.path.append(upper_level_dir)
+cur_dir = os.path.dirname(__file__)
+root = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
+sys.path.append(root)
 from common.segment_tree import SumSegmentTree,MinSegmentTree
 from dataclasses import dataclass
 import torch
@@ -178,8 +180,7 @@ class Agent:
         self.action_dim = env.action_space.n
         self.learning_rate = Config.learning_rate
         self.Q_main = Q_Net(self.state_dim,self.hidden_dim,self.action_dim).to(self.device)
-        self.Q_target = Q_Net(self.state_dim,self.hidden_dim,self.action_dim).to(self.device)
-        self.Q_target.load_state_dict(self.Q_main.state_dict())
+        self.Q_target = copy.deepcopy(self.Q_main)
         self.model = [self.Q_main,self.Q_target]
         self.epsilon = Config.epsilon
         self.optimizer = torch.optim.Adam(params=self.Q_main.parameters(), lr = self.learning_rate)
