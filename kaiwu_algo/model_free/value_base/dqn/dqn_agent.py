@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 import collections
 import random
+import copy
 
 @dataclass
 class SampleData:
@@ -15,7 +16,7 @@ class SampleData:
     next_state: int
     done: bool
 
-# ReplayBuffer, PrioritizedReplayBuffer
+# ReplayBuffer
 class ReplayBuffer():
     
     ''' 经验回放池 
@@ -62,8 +63,7 @@ class Agent:
         self.action_dim = env.action_space.n
         self.learning_rate = Config.learning_rate
         self.Q_main = Q_Net(self.state_dim,self.hidden_dim,self.action_dim).to(self.device)
-        self.Q_target = Q_Net(self.state_dim,self.hidden_dim,self.action_dim).to(self.device)
-        self.Q_target.load_state_dict(self.Q_main.state_dict())
+        self.Q_target = copy.deepcopy(self.Q_main)
         self.model = [self.Q_main,self.Q_target]
         self.epsilon = Config.epsilon
         self.optimizer = torch.optim.Adam(params=self.Q_main.parameters(), lr = self.learning_rate)

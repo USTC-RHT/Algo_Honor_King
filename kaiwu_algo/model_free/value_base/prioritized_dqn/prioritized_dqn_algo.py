@@ -54,9 +54,10 @@ class Algo(BaseAlgo):
 
         main_q_values = model_output_data[np.arange(len(actions)),actions]
 
-        max_q_values = torch.max(self.Q_target.forward(next_states_tensor), dim=1).values
-        target_q_values = rewards + self.gamma * max_q_values * (1 - dones)
-        td_errors = (target_q_values - main_q_values).cpu().detach().numpy()
+        with torch.no_grad():
+            max_q_values = torch.max(self.Q_target.forward(next_states_tensor), dim=1).values
+            target_q_values = rewards + self.gamma * max_q_values * (1 - dones)
+            td_errors = (target_q_values - main_q_values).cpu().detach().numpy()
         losses = F.mse_loss(main_q_values, target_q_values, reduction='none').to(torch.float64)  # 逐元素计算
         weighted_loss = losses @ self.weights       # 对每个元素乘以相应的权重  
         return weighted_loss, td_errors

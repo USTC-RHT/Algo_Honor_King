@@ -15,8 +15,8 @@ from common.rl_utils import moving_average
 # algo_name = 'monte_carlo'
 # algo_name = 'sarsa'
 # algo_name = 'q_learning'
-algo_name = 'reinforce'
-# algo_name = 'dqn'
+# algo_name = 'reinforce'
+algo_name = 'dqn'
 
 if algo_name == 'monte_carlo':
     root1 = os.path.abspath(os.path.join(value_base_dir, "monte_carlo"))
@@ -101,14 +101,14 @@ episodes_list = list(range(len(return_list)))
 plt.plot(episodes_list, return_list)
 plt.xlabel('Episodes')
 plt.ylabel('Returns')
-plt.title('REINFORCE on {}'.format('Cliff Walking'))
+plt.title(f'{algo_name} on {env_name}')
 plt.show()
 
 mv_return = moving_average(return_list, 9)
 plt.plot(episodes_list, mv_return)
 plt.xlabel('Episodes')
 plt.ylabel('Returns')
-plt.title('REINFORCE on {}'.format(env_name))
+plt.title(f'{algo_name} on {env_name}')
 plt.show()
 
 env = gym.make(env_name,render_mode = 'human')

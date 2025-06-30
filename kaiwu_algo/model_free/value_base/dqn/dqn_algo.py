@@ -52,9 +52,9 @@ class Algo(BaseAlgo):
         dones = torch.tensor(dones,device=self.device)
 
         main_q_values = model_output_data[np.arange(len(actions)),actions]
-
-        max_q_values = torch.max(self.Q_target.forward(next_states_tensor), dim=1).values
-        target_q_values = rewards + self.gamma * max_q_values * (1 - dones)
+        with torch.no_grad():
+            max_q_values = torch.max(self.Q_target.forward(next_states_tensor), dim=1).values
+            target_q_values = rewards + self.gamma * max_q_values * (1 - dones)
         loss += F.mse_loss(main_q_values,target_q_values)
         return loss
     
