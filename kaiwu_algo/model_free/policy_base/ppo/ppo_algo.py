@@ -3,17 +3,21 @@ import torch
 import copy
 import math
 import numpy as np
+from torch import nn
+import torch.nn.functional as F
 from torch.distributions import Categorical
 
 class Algo(BaseAlgo):
     def __init__(self, model, config, optimizer=None, device=None, logger=None, monitor=None): 
         self.config = config                             # 配置文件
-        self.gamma = config.gamma                        # 折扣因子
-        self.lambd = config.lambd                        # GAE平滑系数
+        self.gamma = config.gamma                        
+        self.lambd = config.lambd                        
+        self.L2_reg = config.L2_reg
         self.num_epochs = config.num_epochs
         self.batch_size = config.batch_size
         self.clip_rate = config.clip_rate
         self.entropy_coef = config.entropy_coef
+        self.clip_grad_max_norm = config.clip_grad_max_norm
         self.device = device
         self.Actor = model[0].to(self.device)            # 在这里模型 model表示策略神经网络，在智能体中定义
         self.Critic = model[1].to(self.device)
@@ -29,22 +33,17 @@ class Algo(BaseAlgo):
         """
         self.sample_data_check(list_sample_data)    # 检查样本字段是否符合要求
 
-        # model_input_data是一个形状为(batch_size, state_dim)的 tensor
-        model_input_data = self.model.transform_sample_data(list_sample_data,self.device)	    # 将样本转换为模型可推理的格式
+        actor_loss, critic_loss = self.calculate_loss(list_sample_data)	    # 前向传播
+        self.actor_optimizer.zero_grad()					                # actor梯度清零
+        self.critic_optimizer.zero_grad()                                   # critic梯度清零
+        actor_loss.mean().backward()                                        # actor反向传播
+        critic_loss.backward()											    # critic反向传播
+        nn.utils.clip_grad_norm_(self.Actor.parameters(), self.clip_grad_max_norm)      # actor梯度裁剪
+        self.actor_optimizer.step()						                # 更新actor模型参数
+        self.critic_optimizer.step()                                    # 更新critic模型参数
+        self.train_step += 1						                    # 更新计数器
 
-        # model_output_data是一个形状为(batch_size, action_dim)的 tensor
-        model_output_data = self.model.forward(model_input_data)				    # 模型推理
-        actor_loss = self.calculate_loss(list_sample_data, model_output_data)	    # 计算loss
-        self.actor_optimizer.zero_grad()					                        # 清空梯度
-        actor_loss.mean().backward()												
-        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 40)                 # ????
-        self.actor_optimizer.step()						                            # 更新模型
-        self.train_step += 1						                                # 更新计数器
-    
-    def calculate_loss(self,list_sample_data, model_output_data):
-        Return, loss = 0, 0
-        i = -1       
-
+    def calculate_loss(self,list_sample_data):
         states, actions, rewards, next_states, logprob_actions, dws, dones =\
             zip(*[(sample_data.state, sample_data.action, sample_data.reward, 
                 sample_data.next_state,sample_data.logprob_a, sample_data.dw,
@@ -115,16 +114,13 @@ class Algo(BaseAlgo):
                 actor_loss = ppo_loss + entropy_loss
 
                 '''critic loss'''
-                c_loss = (self.Critic(state[index]) - TD_target[index]).pow(2).mean()
+                critic_loss = F.mse_loss(self.Critic(state[index]),TD_target[index])
+
+                '''L2正则化 在损失函数中添加一个正则项来防止过拟合'''
                 for name, param in self.Critic.named_parameters():
                     if 'weight' in name:
-                        c_loss += param.pow(2).sum() * self.l2_reg
-
-                self.critic_optimizer.zero_grad()
-                c_loss.backward()
-                self.critic_optimizer.step()
-
-        return actor_loss
+                        critic_loss += self.L2_reg * param.pow(2).sum()
+        return actor_loss, critic_loss
     
     def sample_data_check(self,list_sample_data):
         if not isinstance(list_sample_data, list):
