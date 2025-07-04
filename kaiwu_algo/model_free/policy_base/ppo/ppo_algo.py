@@ -19,7 +19,7 @@ class Algo(BaseAlgo):
         self.entropy_coef = config.entropy_coef
         self.clip_grad_max_norm = config.clip_grad_max_norm
         self.device = device
-        self.Actor = model[0].to(self.device)            # 在这里模型 model表示策略神经网络，在智能体中定义
+        self.Actor = model[0].to(self.device)
         self.Critic = model[1].to(self.device)
         self.actor_optimizer = optimizer[0]
         self.critic_optimizer = optimizer[1]
@@ -33,17 +33,6 @@ class Algo(BaseAlgo):
         """
         self.sample_data_check(list_sample_data)    # 检查样本字段是否符合要求
 
-        actor_loss, critic_loss = self.calculate_loss(list_sample_data)	    # 前向传播
-        self.actor_optimizer.zero_grad()					                # actor梯度清零
-        self.critic_optimizer.zero_grad()                                   # critic梯度清零
-        actor_loss.mean().backward()                                        # actor反向传播
-        critic_loss.backward()											    # critic反向传播
-        nn.utils.clip_grad_norm_(self.Actor.parameters(), self.clip_grad_max_norm)      # actor梯度裁剪
-        self.actor_optimizer.step()						                # 更新actor模型参数
-        self.critic_optimizer.step()                                    # 更新critic模型参数
-        self.train_step += 1						                    # 更新计数器
-
-    def calculate_loss(self,list_sample_data):
         states, actions, rewards, next_states, logprob_actions, dws, dones =\
             zip(*[(sample_data.state, sample_data.action, sample_data.reward, 
                 sample_data.next_state,sample_data.logprob_a, sample_data.dw,
@@ -120,7 +109,15 @@ class Algo(BaseAlgo):
                 for name, param in self.Critic.named_parameters():
                     if 'weight' in name:
                         critic_loss += self.L2_reg * param.pow(2).sum()
-        return actor_loss, critic_loss
+
+                self.actor_optimizer.zero_grad()			# actor梯度清零
+                self.critic_optimizer.zero_grad()           # critic梯度清零
+                actor_loss.mean().backward()                # actor反向传播
+                critic_loss.backward()						# critic反向传播
+                nn.utils.clip_grad_norm_(self.Actor.parameters(), self.clip_grad_max_norm)   # actor梯度裁剪
+                self.actor_optimizer.step()					# 更新actor模型参数
+                self.critic_optimizer.step()                # 更新critic模型参数
+                self.train_step += 1						# 更新计数器
     
     def sample_data_check(self,list_sample_data):
         if not isinstance(list_sample_data, list):
