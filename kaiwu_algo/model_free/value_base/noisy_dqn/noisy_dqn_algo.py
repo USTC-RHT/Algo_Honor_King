@@ -47,6 +47,7 @@ class Algo(BaseAlgo):
         # 采用软更新(Soft Update)方式:
         for param, target_param in zip(self.Q_main.parameters(), self.Q_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        self.train_step += 1                                                        # 更新计数器
         
 
     def calculate_loss(self,list_sample_data, model_output_data):

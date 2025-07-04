@@ -8,12 +8,13 @@ import collections
 import random
 import copy
 
+'''Python 的 @dataclass 类型标注只是提示,不会强制类型检查或自动转换。'''
 @dataclass
 class SampleData:
-    state: int
+    state: float
     action: int
     reward: float
-    next_state: int
+    next_state: float
     done: bool
 
 # ReplayBuffer
