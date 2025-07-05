@@ -47,7 +47,7 @@ class Actor(torch.nn.Module):
 # 价值网络构造
 class Critic(torch.nn.Module):
     def __init__(self, state_dim, hid_shape):
-        super(Actor, self).__init__()
+        super(Critic, self).__init__()
         layers = []
         layer_shape = [state_dim] + list(hid_shape) + [1]
         '''设置激活函数为 Tanh '''
@@ -84,9 +84,9 @@ class Agent:
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         '''Build Actor and Critic'''
         self.actor = Actor(self.state_dim,self.actor_hidden_layers,self.action_dim).to(self.device)
-        self.actor_optimizer = torch.optim.Adam(params=self.model.parameters(), lr = self.actor_learning_rate)
-        self.critic = Critic(self.state_dim,self.critic_hidden_layers,self.action_dim).to(self.device)
-        self.critic_optimizer = torch.optim.Adam(params=self.model.parameters(), lr = self.critic_learning_rate)
+        self.actor_optimizer = torch.optim.Adam(params=self.actor.parameters(), lr = self.actor_learning_rate)
+        self.critic = Critic(self.state_dim,self.critic_hidden_layers).to(self.device)
+        self.critic_optimizer = torch.optim.Adam(params=self.critic.parameters(), lr = self.critic_learning_rate)
         self.model = [self.actor,self.critic]
         self.optimizer = [self.actor_optimizer,self.critic_optimizer]
 
@@ -97,18 +97,16 @@ class Agent:
             probs = self.actor(s)
             action_dist = torch.distributions.Categorical(probs=probs)
         action = action_dist.sample()
-        return action.item()
+        return action.item(), probs
 
-    def update(self,Episode):
-        # 创建一个 Data 实例
-        list_sample_data = [SampleData(state=obs, action=action, reward=r) for (obs,action,r) in Episode]
+    def update(self,Long_Traj):
         algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
-        algo.learn(list_sample_data)
+        algo.learn(Long_Traj)
     
     def best_action(self,state):
         with torch.no_grad():
             s = torch.tensor(state).view(1, self.state_dim).to(self.device)
-            action = np.argmax(self.model(s).detach().cpu().numpy())
+            action = np.argmax(self.actor(s).detach().cpu().numpy())
         return action
     
 

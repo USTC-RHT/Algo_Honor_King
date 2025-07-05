@@ -17,7 +17,9 @@ class Algo(BaseAlgo):
         self.batch_size = config.batch_size
         self.clip_rate = config.clip_rate
         self.entropy_coef = config.entropy_coef
+        self.entropy_coef_decay = config.entropy_coef_decay
         self.clip_grad_max_norm = config.clip_grad_max_norm
+        self.Advantage_Normal = config.Advantage_Normal
         self.device = device
         self.Actor = model[0].to(self.device)
         self.Critic = model[1].to(self.device)
@@ -39,10 +41,11 @@ class Algo(BaseAlgo):
                 int(sample_data.done)) for sample_data in list_sample_data])
 
         state = torch.tensor(np.array(states), dtype=torch.float32, device=self.device)         
-        action = torch.tensor(np.array(actions), dtype=torch.int, device=self.device)     
+        action = torch.tensor(np.array(actions), dtype=torch.int64, device=self.device)     
         reward = torch.tensor(np.array(rewards), dtype=torch.float32, device=self.device)       
         next_state = torch.tensor(np.array(next_states), dtype=torch.float32, device=self.device)
-        logprob_a = torch.tensor(np.array(logprob_actions), dtype=torch.float32, device=self.device)
+        '''logprob_actions:包含多个tensor的元组'''
+        logprob_a = torch.stack(logprob_actions, dim=0).squeeze()
         dw = torch.tensor(np.array(dws), dtype=torch.int, device=self.device)  
         dones = np.array(dones)
 
@@ -65,15 +68,16 @@ class Algo(BaseAlgo):
             '''去除初始数组中的0元素'''
             A = copy.deepcopy(A[0:-1])    
             A = torch.tensor(A).unsqueeze(1).float().to(self.device)
-            TD_target = A + value
-            # if self.Advantage_Normal:
-            #     A= (A - A.mean()) / ((A.std() + 1e-4))  #sometimes helps 
+            # TD_target = A + value
+            if self.Advantage_Normal:
+                A= (A - A.mean()) / ((A.std() + 1e-4))  #sometimes helps 
 
         '''PPO update'''
         '''Slice long trajectopy into short trajectory and perform mini-batch PPO update'''
         traj_len = dones.shape[0]
         optim_iter_num = int(math.ceil(traj_len / self.batch_size))
 
+        self.entropy_coef *= self.entropy_coef_decay     # exploring decay 探索衰减
         for _ in range(self.num_epochs):
             '''Shuffle the trajectory, Good for training
             perm : short for permutation'''
@@ -90,8 +94,9 @@ class Algo(BaseAlgo):
 
                 '''actor loss'''
                 new_prob = self.Actor(state[index])
-                new_prob_a = new_prob.gather(1, action[index])
-                ratio = torch.exp(torch.log(new_prob_a) - torch.log(old_prob[index]))  # a/b == exp(log(a)-log(b))
+                new_prob_a = new_prob.gather(1, action[index].unsqueeze(1))
+                old_prob_a = old_prob[index].gather(1, action[index].unsqueeze(1))
+                ratio = torch.exp(torch.log(new_prob_a) - torch.log(old_prob_a))  # a/b == exp(log(a)-log(b))
 
                 surr1 = ratio * A[index]
                 '''PPO-截断(PPO-Clip)'''
@@ -109,6 +114,9 @@ class Algo(BaseAlgo):
                 for name, param in self.Critic.named_parameters():
                     if 'weight' in name:
                         critic_loss += self.L2_reg * param.pow(2).sum()
+
+                print(f'actor_loss:{actor_loss.mean()}')
+                print(f'critic_loss:{critic_loss}')
 
                 self.actor_optimizer.zero_grad()			# actor梯度清零
                 self.critic_optimizer.zero_grad()           # critic梯度清零
