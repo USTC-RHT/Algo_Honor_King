@@ -24,7 +24,8 @@ if algo_name == 'ppo':
     from ppo_agent import Agent, SampleData
 
 
-env_name = "CartPole-v1"
+# env_name = "CartPole-v1"
+env_name = 'LunarLander-v3'
 env = gym.make(env_name)
 eval_env = gym.make(env_name)
 # 设置随机数种子,提升训练的可复现性
@@ -37,7 +38,7 @@ torch.backends.cudnn.benchmark = False
 
 agent = Agent(env)
 
-logdir = f"runs/ppo_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+logdir = f"runs/ppo_{env_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 writer = SummaryWriter(log_dir=logdir)
 
 traj_len, total_steps = 0, 0
@@ -53,7 +54,7 @@ while total_steps < Config.Max_train_steps:
         '''Interact with Env'''
         action, logprob_a = agent.take_action(state) # use stochastic when training
         next_state, reward, dw, truncated, _ = env.step(action) # dw: dead&win; tr: truncated
-        if reward <= -100: reward = -30  #good for LunarLander
+        if env_name == 'LunarLander-v3' and reward <= -100: reward = -30  # good for LunarLander
         done = (dw or truncated)
         episode_return += reward
 
@@ -67,9 +68,11 @@ while total_steps < Config.Max_train_steps:
 
         '''Update if its time'''
         if traj_len % Config.max_traj_len == 0:
-            agent.update(Long_Traj)
+            actor_loss, critic_loss = agent.update(Long_Traj)
             Long_Traj = []
             traj_len = 0
+            writer.add_scalar('actor_loss', actor_loss, global_step=total_steps)
+            writer.add_scalar('critic_loss', critic_loss, global_step=total_steps)
 
         '''Eval & Record'''
         if total_steps % Config.eval_interval == 0:

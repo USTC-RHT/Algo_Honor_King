@@ -101,7 +101,8 @@ class Agent:
 
     def update(self,Long_Traj):
         algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
-        algo.learn(Long_Traj)
+        actor_loss, critic_loss = algo.learn(Long_Traj)
+        return actor_loss, critic_loss
     
     def best_action(self,state):
         with torch.no_grad():

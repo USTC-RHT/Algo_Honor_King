@@ -41,12 +41,12 @@ class Algo(BaseAlgo):
                 int(sample_data.done)) for sample_data in list_sample_data])
 
         state = torch.tensor(np.array(states), dtype=torch.float32, device=self.device)         
-        action = torch.tensor(np.array(actions), dtype=torch.int64, device=self.device)     
-        reward = torch.tensor(np.array(rewards), dtype=torch.float32, device=self.device)       
+        action = torch.tensor(np.array(actions), dtype=torch.int64, device=self.device).unsqueeze(1)     
+        reward = torch.tensor(np.array(rewards), dtype=torch.float32, device=self.device).unsqueeze(1)
         next_state = torch.tensor(np.array(next_states), dtype=torch.float32, device=self.device)
         '''logprob_actions:包含多个tensor的元组'''
         logprob_a = torch.stack(logprob_actions, dim=0).squeeze()
-        dw = torch.tensor(np.array(dws), dtype=torch.int, device=self.device)  
+        dw = torch.tensor(np.array(dws), dtype=torch.int, device=self.device).unsqueeze(1)
         dones = np.array(dones)
 
         ''' Use TD + GAE + LongTrajectory to compute Advantage and TD target'''
@@ -68,7 +68,7 @@ class Algo(BaseAlgo):
             '''去除初始数组中的0元素'''
             A = copy.deepcopy(A[0:-1])    
             A = torch.tensor(A).unsqueeze(1).float().to(self.device)
-            # TD_target = A + value
+            TD_target = A + value
             if self.Advantage_Normal:
                 A= (A - A.mean()) / ((A.std() + 1e-4))  #sometimes helps 
 
@@ -84,7 +84,7 @@ class Algo(BaseAlgo):
             perm = np.arange(traj_len)
             np.random.shuffle(perm)
             perm = torch.LongTensor(perm).to(self.device)
-            state, action, TD_target, A, old_prob = \
+            state, action, TD_target, A, logprob_a = \
                 state[perm].clone(), action[perm].clone(), \
                 TD_target[perm].clone(), A[perm].clone(), logprob_a[perm].clone()
 
@@ -94,8 +94,8 @@ class Algo(BaseAlgo):
 
                 '''actor loss'''
                 new_prob = self.Actor(state[index])
-                new_prob_a = new_prob.gather(1, action[index].unsqueeze(1))
-                old_prob_a = old_prob[index].gather(1, action[index].unsqueeze(1))
+                new_prob_a = new_prob.gather(1, action[index])
+                old_prob_a = logprob_a[index].gather(1, action[index])
                 ratio = torch.exp(torch.log(new_prob_a) - torch.log(old_prob_a))  # a/b == exp(log(a)-log(b))
 
                 surr1 = ratio * A[index]
@@ -115,17 +115,21 @@ class Algo(BaseAlgo):
                     if 'weight' in name:
                         critic_loss += self.L2_reg * param.pow(2).sum()
 
-                print(f'actor_loss:{actor_loss.mean()}')
-                print(f'critic_loss:{critic_loss}')
+                # print(f'actor_loss:{actor_loss.mean()}')
+                # print(f'critic_loss:{critic_loss}')
 
                 self.actor_optimizer.zero_grad()			# actor梯度清零
-                self.critic_optimizer.zero_grad()           # critic梯度清零
                 actor_loss.mean().backward()                # actor反向传播
-                critic_loss.backward()						# critic反向传播
                 nn.utils.clip_grad_norm_(self.Actor.parameters(), self.clip_grad_max_norm)   # actor梯度裁剪
                 self.actor_optimizer.step()					# 更新actor模型参数
+
+                self.critic_optimizer.zero_grad()           # critic梯度清零
+                critic_loss.backward()						# critic反向传播
                 self.critic_optimizer.step()                # 更新critic模型参数
+
                 self.train_step += 1						# 更新计数器
+        return actor_loss.mean().detach().cpu().numpy() , critic_loss.detach().cpu().numpy() 
+
     
     def sample_data_check(self,list_sample_data):
         if not isinstance(list_sample_data, list):
