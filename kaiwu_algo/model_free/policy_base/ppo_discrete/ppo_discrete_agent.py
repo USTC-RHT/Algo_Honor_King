@@ -50,7 +50,7 @@ class Critic(torch.nn.Module):
         super(Critic, self).__init__()
         layers = []
         layer_shape = [state_dim] + list(hid_shape) + [1]
-        '''设置激活函数为 Tanh '''
+        '''设置激活函数为 ReLU '''
         activation = nn.ReLU
         '''Build networks with For loop'''
         for j in range(len(layer_shape)-1):

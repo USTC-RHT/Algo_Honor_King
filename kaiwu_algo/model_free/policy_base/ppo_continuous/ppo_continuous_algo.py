@@ -93,8 +93,8 @@ class Algo(BaseAlgo):
                 index = slice(i * self.batch_size, min((i + 1) * self.batch_size, traj_len))
 
                 '''actor loss'''
-                new_prob = self.Actor(state[index])
-                new_prob_a = new_prob.gather(1, action[index])
+                dist = self.Actor.dist(state[index])
+                new_prob_a = dist.log_prob(action[index])
                 old_prob_a = logprob_a[index].gather(1, action[index])
                 ratio = torch.exp(torch.log(new_prob_a) - torch.log(old_prob_a))  # a/b == exp(log(a)-log(b))
 
@@ -103,7 +103,7 @@ class Algo(BaseAlgo):
                 surr2 = torch.clamp(ratio, 1 - self.clip_rate, 1 + self.clip_rate) * A[index]
                 ppo_loss = -torch.min(surr1, surr2)
 
-                entropy = Categorical(probs=new_prob).entropy()
+                entropy = dist.entropy().sum(dim=-1)
                 entropy_loss = - self.entropy_coef * entropy
                 actor_loss = ppo_loss + entropy_loss
 

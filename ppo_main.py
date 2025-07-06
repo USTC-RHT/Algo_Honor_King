@@ -44,6 +44,9 @@ torch.cuda.manual_seed(seed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
+if env_name == 'Pendulum-v1':
+    max_action = float(env.action_space.high[0])
+
 agent = Agent(env)
 
 logdir = f"runs/{algo_name}_{env_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -61,7 +64,9 @@ while total_steps < Config.Max_train_steps:
     while not done:
         '''Interact with Env'''
         action, logprob_a = agent.take_action(state) # use stochastic when training
+        action = 2 * (action - 0.5) * max_action
         next_state, reward, dw, truncated, _ = env.step(action) # dw: dead&win; tr: truncated
+        if env_name == 'Pendulum-v1': reward = (reward + 8) / 8
         if env_name == 'LunarLander-v3' and reward <= -100: reward = -30  # good for LunarLander
         done = (dw or truncated)
         episode_return += reward

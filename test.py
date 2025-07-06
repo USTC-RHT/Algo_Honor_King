@@ -1,18 +1,16 @@
+
 import torch
+from torch.distributions import Categorical
 
-# 构造小型张量
-reward = torch.tensor([1.0, 2.0, 3.0])           # shape: [3]
-next_value = torch.tensor([[10.0], [20.0], [30.0]])  # shape: [3, 1]
-dw = torch.tensor([0, 1, 0])               # shape: [3]
-gamma = 0.99
+# 假设 batch_size = 3，action_dim = 4
+probs = torch.tensor([
+    [1, 0, 0, 0],   # 第一个样本的动作分布
+    [0.25, 0.25, 0.25, 0.25],  # 第二个样本（最大熵）
+    [0.9, 0.05, 0.03, 0.02],   # 第三个样本（最小熵）
+])
 
-temp = gamma * next_value * (1 - dw)
-# 执行表达式
-TD_target = reward + temp
+dist = Categorical(probs=probs)
+entropy = dist.entropy()
 
-# 打印各部分形状和结果
-print("reward.shape:", reward.shape)
-print("next_value.shape:", next_value.shape)
-print("dw.shape:", dw.shape)
-print("TD_target:", TD_target)
-print("TD_target.shape:", TD_target.shape)
+print("entropy:", entropy)
+print("entropy shape:", entropy.shape)

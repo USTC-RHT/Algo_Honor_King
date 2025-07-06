@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from ppo_continuous_algo import Algo
 from ppo_continuous_config import Config
 from dataclasses import dataclass
+from torch.distributions import Normal
 
 '''s, a, r, s_next, logprob_a, dw, done'''
 @dataclass
@@ -21,20 +22,30 @@ class SampleData:
 class Actor(torch.nn.Module):
     def __init__(self, state_dim, hid_shape, action_dim):
         super(Actor, self).__init__()
+        # 1. 先构造共享层（隐藏层）
         layers = []
-        layer_shape = [state_dim] + list(hid_shape) + [action_dim]
-        '''设置激活函数为 Tanh '''
+        layer_shape = [state_dim] + list(hid_shape)
         activation = nn.Tanh
-        '''Build networks with For loop'''
+        
         for j in range(len(layer_shape)-1):
-            if j < len(layer_shape) - 2: 
-                layers += [nn.Linear(layer_shape[j], layer_shape[j+1]), activation()]
-            else: 
-                layers += [nn.Linear(layer_shape[j], layer_shape[j+1]), nn.Softmax(dim=1)]
-        self.Pi = nn.Sequential(*layers)        
+            layers += [nn.Linear(layer_shape[j], layer_shape[j+1]), activation()]
+        
+        # 用Sequential包装共享层
+        self.shared_net = nn.Sequential(*layers)
+        
+        # 2. 分头：mu和sigma分别是两个线性层
+        self.mu_head = nn.Linear(layer_shape[-1], action_dim)
+        self.sigma_head = nn.Linear(layer_shape[-1], action_dim)
 
     def forward(self, x):
-        return self.Pi(x)
+        x = self.shared_net(x)
+        mu = torch.sigmoid(self.mu_head(x))            # 归一化到 0~1
+        sigma = F.softplus(self.sigma_head(x))         # 保证标准差为正
+        return mu, sigma
+    
+    def dist(self,x):
+        mu, sigma = self.forward(x)
+        return Normal(mu,sigma)
     
     def transform_sample_data(self, list_sample_data, device):
         State = []
@@ -51,7 +62,7 @@ class Critic(torch.nn.Module):
         layers = []
         layer_shape = [state_dim] + list(hid_shape) + [1]
         '''设置激活函数为 Tanh '''
-        activation = nn.ReLU
+        activation = nn.Tanh
         '''Build networks with For loop'''
         for j in range(len(layer_shape)-1):
             if j < len(layer_shape) - 2: 
@@ -78,7 +89,7 @@ class Agent:
         self.state_dim = env.observation_space.shape[0]
         self.actor_hidden_layers = Config.actor_hidden_layers
         self.critic_hidden_layers = Config.critic_hidden_layers
-        self.action_dim = env.action_space.n
+        self.action_dim = env.action_space.shape[0]
         self.actor_learning_rate = Config.actor_learning_rate
         self.critic_learning_rate = Config.critic_learning_rate
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -91,24 +102,25 @@ class Agent:
         self.optimizer = [self.actor_optimizer,self.critic_optimizer]
 
     def take_action(self,state):
-        s = torch.tensor(state).view(1, self.state_dim).to(self.device)
-        # 推理得到的结果已经是概率分布
+        # only used when interact with the env
+        state = torch.tensor(state).view(1, self.state_dim).to(self.device)
         with torch.no_grad():
-            probs = self.actor(s)
-            action_dist = torch.distributions.Categorical(probs=probs)
-        action = action_dist.sample()
-        return action.item(), probs
+            dist = self.actor.dist(state)
+            action = dist.sample()
+            action = torch.clamp(action, 0, 1)
+            logprob_a = dist.log_prob(action).cpu().numpy().flatten()
+            return action.cpu().numpy()[0], logprob_a
 
     def update(self,Long_Traj):
         algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
         actor_loss, critic_loss = algo.learn(Long_Traj)
         return actor_loss, critic_loss
     
-    def best_action(self,state):
+    def best_action(self,state): 
+        # only used when evaluate the policy.Making the performance more stable
+        state = torch.tensor(state).view(1, self.state_dim).to(self.device)
         with torch.no_grad():
-            s = torch.tensor(state).view(1, self.state_dim).to(self.device)
-            action = np.argmax(self.actor(s).detach().cpu().numpy())
-        return action
-    
+            mu, _ = self.actor(state)
+            return mu.cpu().numpy()[0]
 
     
