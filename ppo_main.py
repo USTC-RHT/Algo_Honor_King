@@ -15,21 +15,29 @@ from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 
 
-algo_name = 'ppo'
+# algo_name = 'ppo_discrete'
+algo_name = 'ppo_continuous'
 
-if algo_name == 'ppo':
-    root1 = os.path.abspath(os.path.join(policy_base_dir, "ppo"))
+if algo_name == 'ppo_discrete':
+    root1 = os.path.abspath(os.path.join(policy_base_dir, "ppo_discrete"))
     sys.path.append(root1)
-    from ppo_config import Config
-    from ppo_agent import Agent, SampleData
+    from ppo_discrete_config import Config
+    from ppo_discrete_agent import Agent, SampleData
+    # env_name = "CartPole-v1"
+    env_name = 'LunarLander-v3'
+    seed = 209
+elif algo_name == 'ppo_continuous':
+    root1 = os.path.abspath(os.path.join(policy_base_dir, "ppo_continuous"))
+    sys.path.append(root1)
+    from ppo_continuous_config import Config
+    from ppo_continuous_agent import Agent, SampleData
+    env_name = 'Pendulum-v1'
+    seed = 0
 
 
-# env_name = "CartPole-v1"
-env_name = 'LunarLander-v3'
 env = gym.make(env_name)
 eval_env = gym.make(env_name)
 # 设置随机数种子,提升训练的可复现性
-seed = 209
 env_seed = seed
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
@@ -38,7 +46,7 @@ torch.backends.cudnn.benchmark = False
 
 agent = Agent(env)
 
-logdir = f"runs/ppo_{env_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+logdir = f"runs/{algo_name}_{env_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 writer = SummaryWriter(log_dir=logdir)
 
 traj_len, total_steps = 0, 0

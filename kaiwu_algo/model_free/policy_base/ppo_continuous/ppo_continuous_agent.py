@@ -2,8 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ppo_algo import Algo
-from ppo_config import Config
+from ppo_continuous_algo import Algo
+from ppo_continuous_config import Config
 from dataclasses import dataclass
 
 '''s, a, r, s_next, logprob_a, dw, done'''
