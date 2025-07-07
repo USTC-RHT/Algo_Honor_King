@@ -139,7 +139,7 @@ class Agent:
         self.critic_learning_rate = Config.critic_learning_rate
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         '''Build Actor and Critic'''
-        self.actor = GaussianActor(self.state_dim,self.actor_hidden_layers,self.action_dim).to(self.device)
+        self.actor = BetaActor(self.state_dim,self.actor_hidden_layers,self.action_dim).to(self.device)
         self.actor_optimizer = torch.optim.Adam(params=self.actor.parameters(), lr = self.actor_learning_rate)
         self.critic = Critic(self.state_dim,self.critic_hidden_layers).to(self.device)
         self.critic_optimizer = torch.optim.Adam(params=self.critic.parameters(), lr = self.critic_learning_rate)

@@ -66,8 +66,8 @@ while total_steps < Config.Max_train_steps:
         '''Interact with Env'''
         action, logprob_a = agent.take_action(state) # use stochastic when training
         if algo_name == 'ppo_continuous':
-            action = 2 * (action - 0.5) * max_action
-        next_state, reward, dw, truncated, _ = env.step(action) # dw: dead&win; tr: truncated
+            env_action = 2 * (action - 0.5) * max_action
+        next_state, reward, dw, truncated, _ = env.step(env_action) # dw: dead&win; tr: truncated
         if env_name == 'Pendulum-v1': reward = (reward + 8) / 8
         if env_name == 'LunarLander-v3' and reward <= -100: reward = -30  # good for LunarLander
         done = (dw or truncated)
