@@ -41,11 +41,11 @@ class Algo(BaseAlgo):
                 int(sample_data.done)) for sample_data in list_sample_data])
 
         state = torch.tensor(np.array(states), dtype=torch.float32, device=self.device)         
-        action = torch.tensor(np.array(actions), dtype=torch.int64, device=self.device).unsqueeze(1)     
+        action = torch.tensor(np.array(actions), dtype=torch.int64, device=self.device)  
         reward = torch.tensor(np.array(rewards), dtype=torch.float32, device=self.device).unsqueeze(1)
         next_state = torch.tensor(np.array(next_states), dtype=torch.float32, device=self.device)
         '''logprob_actions:包含多个tensor的元组'''
-        logprob_a = torch.stack(logprob_actions, dim=0).squeeze()
+        logprob_a = torch.tensor(np.stack(logprob_actions), dtype=torch.float32, device=self.device)
         dw = torch.tensor(np.array(dws), dtype=torch.int, device=self.device).unsqueeze(1)
         dones = np.array(dones)
 
@@ -95,15 +95,16 @@ class Algo(BaseAlgo):
                 '''actor loss'''
                 dist = self.Actor.dist(state[index])
                 new_prob_a = dist.log_prob(action[index])
-                old_prob_a = logprob_a[index].gather(1, action[index])
-                ratio = torch.exp(torch.log(new_prob_a) - torch.log(old_prob_a))  # a/b == exp(log(a)-log(b))
+                old_prob_a = logprob_a[index]
+                ratio = torch.exp(new_prob_a.sum(dim = 1) - old_prob_a.sum(dim = 1))  # a/b == exp(log(a)-log(b))
+                ratio = ratio.unsqueeze(1)
 
                 surr1 = ratio * A[index]
                 '''PPO-截断(PPO-Clip)'''
                 surr2 = torch.clamp(ratio, 1 - self.clip_rate, 1 + self.clip_rate) * A[index]
                 ppo_loss = -torch.min(surr1, surr2)
 
-                entropy = dist.entropy().sum(dim=-1)
+                entropy = dist.entropy().sum(dim = -1).unsqueeze(1)
                 entropy_loss = - self.entropy_coef * entropy
                 actor_loss = ppo_loss + entropy_loss
 

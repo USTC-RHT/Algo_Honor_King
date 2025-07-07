@@ -103,7 +103,7 @@ class Agent:
 
     def take_action(self,state):
         # only used when interact with the env
-        state = torch.tensor(state).view(1, self.state_dim).to(self.device)
+        state = torch.tensor(state, dtype=torch.float32).view(1, self.state_dim).to(self.device)
         with torch.no_grad():
             dist = self.actor.dist(state)
             action = dist.sample()
@@ -118,7 +118,7 @@ class Agent:
     
     def best_action(self,state): 
         # only used when evaluate the policy.Making the performance more stable
-        state = torch.tensor(state).view(1, self.state_dim).to(self.device)
+        state = torch.tensor(state, dtype=torch.float32).view(1, self.state_dim).to(self.device)
         with torch.no_grad():
             mu, _ = self.actor(state)
             return mu.cpu().numpy()[0]

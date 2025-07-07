@@ -32,6 +32,7 @@ elif algo_name == 'ppo_continuous':
     from ppo_continuous_config import Config
     from ppo_continuous_agent import Agent, SampleData
     env_name = 'Pendulum-v1'
+    # env_name = 'HalfCheetah-v5'
     seed = 0
 
 
@@ -44,7 +45,7 @@ torch.cuda.manual_seed(seed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
-if env_name == 'Pendulum-v1':
+if env_name == 'Pendulum-v1' or 'HalfCheetah-v5':
     max_action = float(env.action_space.high[0])
 
 agent = Agent(env)
@@ -64,7 +65,8 @@ while total_steps < Config.Max_train_steps:
     while not done:
         '''Interact with Env'''
         action, logprob_a = agent.take_action(state) # use stochastic when training
-        action = 2 * (action - 0.5) * max_action
+        if algo_name == 'ppo_continuous':
+            action = 2 * (action - 0.5) * max_action
         next_state, reward, dw, truncated, _ = env.step(action) # dw: dead&win; tr: truncated
         if env_name == 'Pendulum-v1': reward = (reward + 8) / 8
         if env_name == 'LunarLander-v3' and reward <= -100: reward = -30  # good for LunarLander
