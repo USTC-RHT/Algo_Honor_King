@@ -16,7 +16,7 @@ from common.rl_utils import moving_average
 # algo_name = 'sarsa'
 # algo_name = 'q_learning'
 # algo_name = 'reinforce'
-algo_name = 'dqn'
+algo_name = 'a2c'
 
 if algo_name == 'monte_carlo':
     root1 = os.path.abspath(os.path.join(value_base_dir, "monte_carlo"))
@@ -38,11 +38,11 @@ if algo_name == 'reinforce':
     sys.path.append(root1)
     from reinforce_config import Config
     from reinforce_agent import Agent
-if algo_name == 'dqn':
-    root1 = os.path.abspath(os.path.join(value_base_dir, "dqn"))
+if algo_name == 'a2c':
+    root1 = os.path.abspath(os.path.join(value_base_dir, "a2c"))
     sys.path.append(root1)
-    from dqn_config import Config
-    from dqn_agent import Agent,ReplayBuffer
+    from a2c_config import Config
+    from a2c_agent import Agent
 
 
 # env_name = "CliffWalking-v0"    # "FrozenLake-v1"
@@ -52,8 +52,7 @@ if algo_name in ['reinforce','dqn']:
     agent = Agent(env)
 else:
     agent = Agent(env_name)
-if algo_name == 'dqn':
-    replaybuffer = ReplayBuffer(Config.buffer_size)
+
 
 return_list = []
 for i in range(10):
@@ -67,8 +66,6 @@ for i in range(10):
                 action = agent.take_action(obs)
                 next_obs, r, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
-                if algo_name == 'dqn':
-                    replaybuffer.add(obs, action, r, next_obs, done)
                 episode_return += r 
                 if algo_name in ['monte_carlo','reinforce']:
                     Episode.append((obs,action,r))      
@@ -77,11 +74,6 @@ for i in range(10):
                     agent.update(obs,action,r,next_obs,next_action,done)                
                 if algo_name == 'q_learning':
                     agent.update(obs,action,r,next_obs,done)
-                if algo_name == 'dqn':
-                    # 当buffer数据的数量超过一定值后,才进行Q网络训练
-                    if replaybuffer.size() > Config.minimal_size:
-                        transitions = replaybuffer.sample(Config.batch_size)
-                        agent.update(transitions)
                 obs = next_obs
             if algo_name in ['monte_carlo','reinforce']:
                 agent.update(Episode)
