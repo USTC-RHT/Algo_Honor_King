@@ -70,7 +70,7 @@ if algo_name == 'prioritized_dqn':
 else:  
     replaybuffer = ReplayBuffer(Config.buffer_size)
 
-logdir = f"runs/exp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+logdir = f"runs/dqn_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 writer = SummaryWriter(log_dir=logdir)
 
 return_list = []
@@ -79,7 +79,8 @@ for i in range(10):
     with tqdm(total=int(Config.num_episodes/10),desc='Iteration %d' % i) as pbar:
         for i_episode in range(int(Config.num_episodes/10)):
             episode_return = 0
-            obs, _ = env.reset(seed=env_seed)
+            # Do not use seed directly, or it can overfit to seed
+            obs, _ = env.reset(seed=env_seed) 
             env_seed += 1
             done = False
             Episode = []

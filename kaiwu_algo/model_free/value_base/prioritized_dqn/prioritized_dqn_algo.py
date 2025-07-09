@@ -33,10 +33,10 @@ class Algo(BaseAlgo):
 
         # model_output_data是一个形状为(batch_size, action_dim)的 tensor,是主神经网络的输出
         model_output_data = self.Q_main.forward(model_input_data)				    # 模型推理
-        self.optimizer.zero_grad()					                                # 清空梯度
-        loss, td_errors = self.calculate_loss(list_sample_data, model_output_data)	# 计算loss
-        loss.backward()													            # 计算梯度
-        self.optimizer.step()						                                # 更新模型
+        loss, td_errors = self.calculate_loss(list_sample_data, model_output_data)	# 前向传播
+        self.optimizer.zero_grad()	                                                # 梯度清零	        
+        loss.backward()													            # 反向传播
+        self.optimizer.step()						                                # 更新参数
 
         if self.train_step % self.config.target_network_update_freq == 0:
             self.Q_target.load_state_dict(self.Q_main.state_dict())                 # 更新目标网络

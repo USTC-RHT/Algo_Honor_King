@@ -33,10 +33,10 @@ class Algo(BaseAlgo):
 
         # model_output_data是一个形状为(batch_size, action_dim)的 tensor,是主神经网络的输出
         model_output_data = self.Q_main.forward(model_input_data)				    # 模型推理
-        self.optimizer.zero_grad()					                                # 清空梯度
-        loss = self.calculate_loss(list_sample_data, model_output_data)	            # 计算loss
-        loss.backward()													            # 计算梯度
-        self.optimizer.step()						                                # 更新模型
+        loss = self.calculate_loss(list_sample_data, model_output_data)	            # 前向传播
+        self.optimizer.zero_grad()	                                                # 梯度清零	        
+        loss.backward()													            # 反向传播
+        self.optimizer.step()						                                # 更新参数
 
         '''
         if self.train_step % self.config.target_network_update_freq == 0:
@@ -47,6 +47,7 @@ class Algo(BaseAlgo):
         # 采用软更新(Soft Update)方式:
         for param, target_param in zip(self.Q_main.parameters(), self.Q_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        self.train_step += 1                                                        # 更新计数器
         
 
     def calculate_loss(self,list_sample_data, model_output_data):
