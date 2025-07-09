@@ -24,13 +24,13 @@ class Algo(BaseAlgo):
         model_input_data = self.model.transform_sample_data(list_sample_data,self.device)	    # 将样本转换为模型可推理的格式
 
         # model_output_data是一个形状为(batch_size, action_dim)的 tensor
-        model_output_data = self.model.forward(model_input_data)				    # 模型推理
-        self.optimizer.zero_grad()					                                # 清空梯度
-        loss = self.calculate_loss(list_sample_data, model_output_data)	            # 计算loss
-        loss.backward()													            # 计算梯度
-        self.optimizer.step()						                                # 更新模型
+        model_output_data = self.model.forward(model_input_data)				    # 模型推理    
+        loss = self.calculate_loss(list_sample_data, model_output_data)	            # 前向传播
+        self.optimizer.zero_grad()	                                                # 梯度清零	        
+        loss.backward()													            # 反向传播
+        self.optimizer.step()						                                # 更新参数
         self.train_step += 1						                                # 更新计数器
-    
+
     def calculate_loss(self,list_sample_data, model_output_data):
         Return, loss = 0, 0
         i = -1        
