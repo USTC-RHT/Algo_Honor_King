@@ -29,8 +29,8 @@ def evaluate_policy(env, agent, turns = 3):
     agent.Q_main.train()
     return int(total_scores/turns)
 
-# 用于 ppo中的策略评估
-def evaluate_policy_ppo(env, agent, turns = 3):
+# 用于 ppo_discrete中的策略评估
+def evaluate_policy_ppo_discrete(env, agent, turns = 3):
     agent.actor.eval() # Take deterministic actions at test time
     total_scores = 0
     for _ in range(turns):
@@ -39,6 +39,24 @@ def evaluate_policy_ppo(env, agent, turns = 3):
         while not done:
             action = agent.best_action(state)
             next_state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            total_scores += reward
+            state = next_state
+    agent.actor.train()
+    return int(total_scores/turns)
+
+# 用于 ppo_continuous中的策略评估
+def evaluate_policy_ppo_continuous(env, agent, turns = 3):
+    agent.actor.eval() # Take deterministic actions at test time
+    total_scores = 0
+    max_action = float(env.action_space.high[0])
+    for _ in range(turns):
+        state, _ = env.reset()
+        done = False
+        while not done:
+            action = agent.best_action(state)
+            env_action = 2 * (action - 0.5) * max_action
+            next_state, reward, terminated, truncated, _ = env.step(env_action)
             done = terminated or truncated
             total_scores += reward
             state = next_state

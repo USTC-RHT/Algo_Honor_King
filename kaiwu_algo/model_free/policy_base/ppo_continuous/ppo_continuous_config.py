@@ -13,6 +13,6 @@ class Config:
     entropy_coef = 1e-3                    # actor中 entropy loss的系数(熵系数)
     entropy_coef_decay = 0.99              # 熵系数的衰减率
     clip_grad_max_norm = 40                # 梯度裁剪的最大梯度上限
-    Advantage_Normal = False               # 是否进行优势的归一化
+    Advantage_Normal = True                # 是否进行优势的归一化
     eval_interval = 1000                   # 评估频率
     max_traj_len = 2048                    # 长轨迹的最大长度

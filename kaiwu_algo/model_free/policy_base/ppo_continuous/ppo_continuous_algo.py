@@ -41,7 +41,7 @@ class Algo(BaseAlgo):
                 int(sample_data.done)) for sample_data in list_sample_data])
 
         state = torch.tensor(np.array(states), dtype=torch.float32, device=self.device)         
-        action = torch.tensor(np.array(actions), dtype=torch.int64, device=self.device)  
+        action = torch.tensor(np.array(actions), dtype=torch.float32, device=self.device)  
         reward = torch.tensor(np.array(rewards), dtype=torch.float32, device=self.device).unsqueeze(1)
         next_state = torch.tensor(np.array(next_states), dtype=torch.float32, device=self.device)
         '''logprob_actions:包含多个tensor的元组'''
