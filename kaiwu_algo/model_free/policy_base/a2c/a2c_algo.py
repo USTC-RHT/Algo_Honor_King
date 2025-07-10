@@ -23,20 +23,20 @@ class Algo(BaseAlgo):
     def learn(self, list_sample_data):
         self.sample_data_check(list_sample_data)    # 检查样本字段是否符合要求
 
-        states, actions, rewards, next_states, dones =\
+        states, actions, rewards, next_states, dws =\
             zip(*[(sample_data.state, sample_data.action, sample_data.reward, 
-                sample_data.next_state,int(sample_data.done)) for sample_data in list_sample_data])
+                sample_data.next_state,int(sample_data.dw)) for sample_data in list_sample_data])
 
         state = torch.tensor(np.array(states), dtype=torch.float32, device=self.device)         
         action = torch.tensor(np.array(actions), dtype=torch.int64, device=self.device).unsqueeze(1)     
         reward = torch.tensor(np.array(rewards), dtype=torch.float32, device=self.device).unsqueeze(1)
         next_state = torch.tensor(np.array(next_states), dtype=torch.float32, device=self.device)
-        done = torch.tensor(np.array(dones), dtype=torch.int64, device=self.device).unsqueeze(1)
+        dw = torch.tensor(np.array(dws), dtype=torch.int64, device=self.device).unsqueeze(1)
 
         with torch.no_grad():
             value = self.Critic(state)
             next_value = self.Critic(next_state)
-            TD_target = reward + self.gamma * next_value * (1 - done)
+            TD_target = reward + self.gamma * next_value * (1 - dw)
             A = TD_target - value
 
             if self.Advantage_Normal:
