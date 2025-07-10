@@ -6,15 +6,13 @@ from a2c_algo import Algo
 from a2c_config import Config
 from dataclasses import dataclass
 
-'''s, a, r, s_next, logprob_a, dw, done'''
+'''s, a, r, s_next, dw'''
 @dataclass
 class SampleData:
     state: float
     action: int
     reward: float
     next_state: float
-    logprob_a: float
-    dw: bool
     done: bool
 
 # 策略网络构造
@@ -22,7 +20,10 @@ class Actor(torch.nn.Module):
     def __init__(self, state_dim, hid_shape, action_dim):
         super(Actor, self).__init__()
         layers = []
-        layer_shape = [state_dim] + list(hid_shape) + [action_dim]
+        if isinstance(hid_shape, int):
+            layer_shape = [state_dim] + [hid_shape] + [action_dim]
+        else:
+            layer_shape = [state_dim] + list(hid_shape) + [action_dim]
         '''设置激活函数为 ReLU '''
         activation = nn.ReLU
         '''Build networks with For loop'''
@@ -49,7 +50,10 @@ class Critic(torch.nn.Module):
     def __init__(self, state_dim, hid_shape):
         super(Critic, self).__init__()
         layers = []
-        layer_shape = [state_dim] + list(hid_shape) + [1]
+        if isinstance(hid_shape, int):
+            layer_shape = [state_dim] + [hid_shape] + [1]
+        else:
+            layer_shape = [state_dim] + list(hid_shape) + [1]
         '''设置激活函数为 ReLU '''
         activation = nn.ReLU
         '''Build networks with For loop'''
@@ -97,11 +101,13 @@ class Agent:
             probs = self.actor(s)
             action_dist = torch.distributions.Categorical(probs=probs)
         action = action_dist.sample()
-        return action.item(), probs
+        return action.item()
 
-    def update(self,Long_Traj):
+    def update(self,Episode):
+        list_sample_data = [SampleData(state=obs, action=action, reward=r, next_state=next_obs, done=done) \
+                            for (obs,action,r,next_obs,done) in Episode]
         algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
-        actor_loss, critic_loss = algo.learn(Long_Traj)
+        actor_loss, critic_loss = algo.learn(list_sample_data)
         return actor_loss, critic_loss
     
     def best_action(self,state):

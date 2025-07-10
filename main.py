@@ -39,16 +39,16 @@ if algo_name == 'reinforce':
     from reinforce_config import Config
     from reinforce_agent import Agent
 if algo_name == 'a2c':
-    root1 = os.path.abspath(os.path.join(value_base_dir, "a2c"))
+    root1 = os.path.abspath(os.path.join(policy_base_dir, "a2c"))
     sys.path.append(root1)
     from a2c_config import Config
     from a2c_agent import Agent
 
 
 # env_name = "CliffWalking-v0"    # "FrozenLake-v1"
-env_name = "CartPole-v0"
+env_name = "CartPole-v1"
 env = gym.make(env_name)
-if algo_name in ['reinforce','dqn']:
+if algo_name in ['reinforce','dqn','a2c']:
     agent = Agent(env)
 else:
     agent = Agent(env_name)
@@ -64,18 +64,20 @@ for i in range(10):
             Episode = []
             while not done:
                 action = agent.take_action(obs)
-                next_obs, r, terminated, truncated, _ = env.step(action)
-                done = terminated or truncated
+                next_obs, r, dw, truncated, _ = env.step(action)
+                done = dw or truncated
                 episode_return += r 
                 if algo_name in ['monte_carlo','reinforce']:
                     Episode.append((obs,action,r))      
-                if algo_name == 'sarsa':
+                elif algo_name == 'sarsa':
                     next_action = agent.take_action(next_obs)
                     agent.update(obs,action,r,next_obs,next_action,done)                
-                if algo_name == 'q_learning':
+                elif algo_name == 'q_learning':
                     agent.update(obs,action,r,next_obs,done)
+                elif algo_name == 'a2c':
+                    Episode.append((obs,action,r,next_obs,done))
                 obs = next_obs
-            if algo_name in ['monte_carlo','reinforce']:
+            if algo_name in ['monte_carlo','reinforce','a2c']:
                 agent.update(Episode)
             return_list.append(episode_return)
             if (i_episode + 1) % 10 == 0:
