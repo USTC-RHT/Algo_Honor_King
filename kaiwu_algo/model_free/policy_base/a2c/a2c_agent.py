@@ -73,7 +73,6 @@ class Critic(torch.nn.Module):
             
         tensor_state = torch.tensor(np.array(State)).to(device)
         return tensor_state
-    
 
 class Agent:
     def __init__(self,env):
