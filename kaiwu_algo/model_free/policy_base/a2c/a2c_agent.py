@@ -12,7 +12,7 @@ class SampleData:
     action: int
     reward: float
     next_state: float
-    done: bool
+    dw: bool
 
 # 策略网络构造
 class Actor(torch.nn.Module):
@@ -103,8 +103,8 @@ class Agent:
         return action.item()
 
     def update(self,Episode):
-        list_sample_data = [SampleData(state=obs, action=action, reward=r, next_state=next_obs, done=done) \
-                            for (obs,action,r,next_obs,done) in Episode]
+        list_sample_data = [SampleData(state=obs, action=action, reward=r, next_state=next_obs, dw=dw) \
+                            for (obs,action,r,next_obs,dw) in Episode]
         algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
         actor_loss, critic_loss = algo.learn(list_sample_data)
         return actor_loss, critic_loss

@@ -74,7 +74,7 @@ for i in range(10):
                 elif algo_name == 'q_learning':
                     agent.update(obs,action,r,next_obs,done)
                 elif algo_name == 'a2c':
-                    Episode.append((obs,action,r,next_obs,done))
+                    Episode.append((obs,action,r,next_obs,dw))
                 obs = next_obs
             if algo_name in ['monte_carlo','reinforce','a2c']:
                 agent.update(Episode)
