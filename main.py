@@ -91,7 +91,7 @@ for i in range(10):
                 })
             pbar.update(1)
 
-print(total_steps)
+# print(total_steps)
 episodes_list = list(range(len(return_list)))
 # # 设置纵坐标范围为 -250 到 0
 # plt.ylim(-250, 0)
