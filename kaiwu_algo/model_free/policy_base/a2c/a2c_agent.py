@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from a2c_algo import Algo
 from a2c_config import Config
 from dataclasses import dataclass
