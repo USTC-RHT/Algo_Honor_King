@@ -46,6 +46,7 @@ if algo_name == 'a2c':
 
 # env_name = "CliffWalking-v0"    # "FrozenLake-v1"
 env_name = "CartPole-v1"
+# env_name = "Acrobot-v1"
 env = gym.make(env_name)
 if algo_name in ['reinforce','dqn','a2c']:
     agent = Agent(env)
@@ -54,6 +55,7 @@ else:
 
 
 return_list = []
+total_steps = 0
 for i in range(10):
     with tqdm(total=int(Config.num_episodes/10),desc='Iteration %d' % i) as pbar:
         for i_episode in range(int(Config.num_episodes/10)):
@@ -66,6 +68,7 @@ for i in range(10):
                 next_obs, r, dw, truncated, _ = env.step(action)
                 done = dw or truncated
                 episode_return += r 
+                total_steps += 1
                 if algo_name in ['monte_carlo','reinforce']:
                     Episode.append((obs,action,r))      
                 elif algo_name == 'sarsa':
@@ -88,6 +91,7 @@ for i in range(10):
                 })
             pbar.update(1)
 
+print(total_steps)
 episodes_list = list(range(len(return_list)))
 # # 设置纵坐标范围为 -250 到 0
 # plt.ylim(-250, 0)
