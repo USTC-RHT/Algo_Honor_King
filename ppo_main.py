@@ -10,7 +10,7 @@ cur_dir = os.path.dirname(__file__)
 root = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
 sys.path.append(root)
 policy_base_dir = os.path.join(root, "model_free", "policy_base")
-from common.rl_utils import evaluate_policy_ppo_discrete, evaluate_policy_ppo_continuous
+from common.rl_utils import evaluate_policy, evaluate_policy_ppo_continuous
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 
@@ -92,7 +92,7 @@ while total_steps < Config.Max_train_steps:
         '''Eval & Record'''
         if total_steps % Config.eval_interval == 0:
             if algo_name == 'ppo_discrete':
-                score = evaluate_policy_ppo_discrete(eval_env, agent, turns=10) # evaluate the policy for 3 times, and get averaged result
+                score = evaluate_policy(eval_env, agent, turns=10) # evaluate the policy for 3 times, and get averaged result
             elif algo_name == 'ppo_continuous':
                 score = evaluate_policy_ppo_continuous(eval_env, agent, turns=10)
             writer.add_scalar('ep_r', score, global_step=total_steps)

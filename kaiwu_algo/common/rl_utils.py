@@ -29,8 +29,8 @@ def evaluate_policy(env, agent, turns = 3):
     agent.Q_main.train()
     return int(total_scores/turns)
 
-# 用于 ppo_discrete中的策略评估
-def evaluate_policy_ppo_discrete(env, agent, turns = 3):
+# 用于 ppo_discrete、ddpg中的策略评估
+def evaluate_policy(env, agent, turns = 3):
     agent.actor.eval() # Take deterministic actions at test time
     total_scores = 0
     for _ in range(turns):
