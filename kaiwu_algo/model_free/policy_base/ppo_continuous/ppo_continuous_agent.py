@@ -62,7 +62,7 @@ class GaussianActor(torch.nn.Module):
 class BetaActor(torch.nn.Module):
     def __init__(self, state_dim, hid_shape, action_dim):
         super(BetaActor, self).__init__()
-        # 1. 先构造共享层（隐藏层）
+        # 先构造共享层（隐藏层）
         layers = []
         layer_shape = [state_dim] + list(hid_shape)
         activation = nn.Tanh
@@ -73,7 +73,6 @@ class BetaActor(torch.nn.Module):
         # 用Sequential包装共享层
         self.shared_net = nn.Sequential(*layers)
         
-        # 2. 分头：mu和sigma分别是两个线性层
         self.alpha_head = nn.Linear(layer_shape[-1], action_dim)
         self.beta_head = nn.Linear(layer_shape[-1], action_dim)
 
@@ -145,6 +144,7 @@ class Agent:
         self.critic_optimizer = torch.optim.Adam(params=self.critic.parameters(), lr = self.critic_learning_rate)
         self.model = [self.actor,self.critic]
         self.optimizer = [self.actor_optimizer,self.critic_optimizer]
+        self.algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
 
     def take_action(self,state):
         # only used when interact with the env
@@ -157,8 +157,7 @@ class Agent:
             return action.cpu().numpy()[0], logprob_a
 
     def update(self,Long_Traj):
-        algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
-        actor_loss, critic_loss = algo.learn(Long_Traj)
+        actor_loss, critic_loss = self.algo.learn(Long_Traj)
         return actor_loss, critic_loss
     
     def best_action(self,state): 

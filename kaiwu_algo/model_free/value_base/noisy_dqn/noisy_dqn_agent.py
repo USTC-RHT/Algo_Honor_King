@@ -5,7 +5,6 @@ from dataclasses import dataclass
 import copy
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import collections
 import random
 import sys

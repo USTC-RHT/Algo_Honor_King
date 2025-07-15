@@ -12,6 +12,18 @@ def moving_average(a, window_size):
     end = (np.cumsum(a[:-window_size:-1])[::2] / r)[::-1]
     return np.concatenate((begin, middle, end))
 
+#reward engineering for better training
+def reward_shaping(reward, env_name):
+    if env_name == 'Pendulum-v1':
+        reward = (reward + 8) / 8
+
+    elif env_name == 'LunarLanderContinuous-v3':
+        if reward <= -100: reward = -10
+
+    elif env_name in ['BipedalWalker-v3', 'BipedalWalkerHardcore-v3']:
+        if reward <= -100: reward = -1
+    return reward
+
 # 用于 noisy_dqn中的策略评估
 def evaluate_policy(env, agent, turns = 3):
     agent.Q_main.eval() # Take deterministic actions at test time
@@ -29,8 +41,8 @@ def evaluate_policy(env, agent, turns = 3):
     agent.Q_main.train()
     return int(total_scores/turns)
 
-# 用于 ppo_discrete中的策略评估
-def evaluate_policy_ppo_discrete(env, agent, turns = 3):
+# 用于 ppo_discrete、ddpg中的策略评估
+def evaluate_policy(env, agent, turns = 3):
     agent.actor.eval() # Take deterministic actions at test time
     total_scores = 0
     for _ in range(turns):
