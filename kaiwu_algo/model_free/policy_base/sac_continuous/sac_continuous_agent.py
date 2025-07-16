@@ -132,9 +132,6 @@ class Double_Q_Critic(nn.Module):
 
     def forward(self, state, action):
         return self.q1(state, action), self.q2(state, action)
-
-    def Q1(self, state, action):
-        return self.q1(state, action)
     
 class Agent:
     def __init__(self,env):

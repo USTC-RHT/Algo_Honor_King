@@ -11,18 +11,32 @@ from common.rl_utils import evaluate_policy, reward_shaping
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 
+# algo_name = 'sac_continuous'
+algo_name = 'sac_discrete'
+
+if algo_name == 'sac_continuous':
+    root = os.path.abspath(os.path.join(policy_base_dir, "sac_continuous"))
+    sys.path.append(root)
+    from sac_continuous_config import Config
+    from sac_continuous_agent import Agent, ReplayBuffer
+elif algo_name == 'sac_discrete':
+    root = os.path.abspath(os.path.join(policy_base_dir, "sac_discrete"))
+    sys.path.append(root)
+    from sac_discrete_config import Config
+    from sac_discrete_agent import Agent, ReplayBuffer
+
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--env_name', type=str, default='LunarLanderContinuous-v3', help='环境名称')
-parser.add_argument('--seed', type=int, default=0, help='随机种子')
+if algo_name == 'sac_continuous':
+    parser.add_argument('--env_name', type=str, default='LunarLanderContinuous-v3', help='环境名称')
+    parser.add_argument('--seed', type=int, default=0, help='随机种子')
+    max_action = float(env.action_space.high[0])
+elif algo_name == 'sac_discrete':
+    parser.add_argument('--env_name', type=str, default='CartPole-v1', help='环境名称')
+    parser.add_argument('--seed', type=int, default=0, help='随机种子')
+
 args = parser.parse_args()
-
 print(f"环境: {args.env_name}, 随机种子: {args.seed}")
-
-algo_name = 'sac_continuous'
-root = os.path.abspath(os.path.join(policy_base_dir, "sac_continuous"))
-sys.path.append(root)
-from sac_continuous_config import Config
-from sac_continuous_agent import Agent, ReplayBuffer
 
 # env_name = 'Pendulum-v1'
 # env_name = 'LunarLanderContinuous-v3'
@@ -38,7 +52,7 @@ torch.cuda.manual_seed(seed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 max_ep_steps = env.spec.max_episode_steps
-max_action = float(env.action_space.high[0])
+if algo_name == 'sac_continuous': max_action = float(env.action_space.high[0])
 '''初始化智能体与回放池'''
 agent = Agent(env)
 replaybuffer = ReplayBuffer(Config.buffer_size)

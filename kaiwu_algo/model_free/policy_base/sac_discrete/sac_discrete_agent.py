@@ -7,8 +7,7 @@ import torch.nn as nn
 from sac_discrete_algo import Algo
 from sac_discrete_config import Config
 from dataclasses import dataclass
-from torch.distributions import Normal
-import torch.nn.functional as F
+from torch.distributions import Categorical
 
 '''s, a, r, s_next, dw'''
 @dataclass
@@ -46,56 +45,20 @@ class Actor(torch.nn.Module):
     def __init__(self, state_dim, hid_shape, action_dim):
         super().__init__()
         layers = []
-        layer_shape = [state_dim] + list(hid_shape)
+        layer_shape = [state_dim] + list(hid_shape) + [action_dim]
         '''设置激活函数为 ReLU '''
         activation = nn.ReLU
         '''Build networks with For loop'''
         for j in range(len(layer_shape)-1):
-            layers += [nn.Linear(layer_shape[j], layer_shape[j+1]), activation()]
-        # 用Sequential包装共享层
-        self.shared_net = nn.Sequential(*layers)
-        
-        '''分头: mu和log_sigma分别是两个线性层'''
-        self.mu_head = nn.Linear(layer_shape[-1], action_dim)
-        self.log_sigma_head = nn.Linear(layer_shape[-1], action_dim)
-        self.log_sigma_min, self.log_sigma_max = Config.LOG_SIGMA_RANGE
+            if j < len(layer_shape) - 2: 
+                layers += [nn.Linear(layer_shape[j], layer_shape[j+1]), activation()]
+            else: 
+                layers += [nn.Linear(layer_shape[j], layer_shape[j+1]), nn.Softmax(dim=1)]
+        self.Pi = nn.Sequential(*layers)   
      
     def forward(self, x):
-        x = self.shared_net(x)
-        mu = self.mu_head(x)
-        log_sigma = self.log_sigma_head(x)
-        '''learn log_std rather than std, so that exp(log_std) is always > 0'''
-        log_sigma = torch.clamp(log_sigma,self.log_sigma_min,self.log_sigma_max)
-        sigma = torch.exp(log_sigma)
-        '''仅返回均值与方差'''
-        return mu, sigma
+        return self.Pi(x)
     
-    def dist(self,x):
-        mu, sigma = self.forward(x)
-        '''高斯分布'''
-        return Normal(mu,sigma)
-    
-    def enforce_action_bounds(self,u,dist):
-        '''↓↓↓ Enforcing Action Bounds ↓↓↓'''
-        a = torch.tanh(u)
-        ''' Get probability density of logp_pi_a from probability density of u:
-        logp_pi_a = (dist.log_prob(u) - torch.log(1 - a.pow(2) + 1e-6)).sum(dim=1, keepdim=True)
-        Derive from the above equation. No a, thus no tanh(h), thus less gradient vanish and more stable.'''
-        logp_pi_a = dist.log_prob(u).sum(axis=1, keepdim=True) \
-        - (2 * (torch.log(torch.tensor(2.0)) - u - F.softplus(-2 * u))).sum(axis=1, keepdim=True)
-        return a, logp_pi_a
-    
-    def sample_act(self,state):
-        dist = self.dist(state)
-        '''rsample() 通过重参数化技巧(reparameterization trick),让采样过程可微,从而可以用梯度下降法优化参数'''
-        u = dist.rsample()
-        a, logp_pi_a = self.enforce_action_bounds(u,dist)
-        return a, logp_pi_a
-    
-    def deterministic_act(self,state):
-        mu, _ = self.forward(state)
-        return mu
-
     def transform_sample_data(self, list_sample_data, device):
         State = []
         for sample_data in list_sample_data:
@@ -108,7 +71,7 @@ class MLP_QNet(nn.Module):
     def __init__(self, state_dim, hid_shape, action_dim):
         super().__init__()
         layers = []
-        layer_shape = [state_dim + action_dim] + list(hid_shape) + [1]
+        layer_shape = [state_dim] + list(hid_shape) + [action_dim]
         '''设置激活函数为 ReLU '''
         activation = nn.ReLU
         '''Build networks with For loop'''
@@ -119,9 +82,8 @@ class MLP_QNet(nn.Module):
                 layers += [nn.Linear(layer_shape[j], layer_shape[j+1])]
         self.Q = nn.Sequential(*layers)  
 
-    def forward(self, state, action):
-        sa = torch.cat([state, action], dim=1)
-        return self.Q(sa)
+    def forward(self, state):
+        return self.Q(state)
 
 # Soft价值网络构造
 class Double_Q_Critic(nn.Module):
@@ -130,11 +92,8 @@ class Double_Q_Critic(nn.Module):
         self.q1 = MLP_QNet(state_dim, hid_shape, action_dim)
         self.q2 = MLP_QNet(state_dim, hid_shape, action_dim)
 
-    def forward(self, state, action):
-        return self.q1(state, action), self.q2(state, action)
-
-    def Q1(self, state, action):
-        return self.q1(state, action)
+    def forward(self, state):
+        return self.q1(state), self.q2(state)
     
 class Agent:
     def __init__(self,env):
@@ -145,7 +104,7 @@ class Agent:
         self.state_dim = env.observation_space.shape[0]
         self.actor_hidden_layers = Config.actor_hidden_layers
         self.critic_hidden_layers = Config.critic_hidden_layers
-        self.action_dim = env.action_space.shape[0]
+        self.action_dim = env.action_space.n
         self.actor_learning_rate = Config.actor_learning_rate
         self.critic_learning_rate = Config.critic_learning_rate
         self.log_alpha_learning_rate = Config.log_actor_learning_rate
@@ -169,18 +128,19 @@ class Agent:
         self.algo = Algo(model = self.model, config = self.config,  optimizer = self.optimizer, device = self.device)
 
     def take_action(self,state):
-        s = torch.tensor(state).view(1, self.state_dim).to(self.device)
         with torch.no_grad():
-            a, logp_pi_a = self.actor.sample_act(s)
-            action = a.cpu().numpy()[0]
-        return action, logp_pi_a
+            s = torch.tensor(state).view(1, self.state_dim).to(self.device)
+            probs = self.actor(s)
+            action_dist = Categorical(probs=probs)
+        action = action_dist.sample()
+        return action.item()
 
     def update(self,transitions):
         actor_loss, critic_loss = self.algo.learn(transitions)
         return actor_loss, critic_loss
     
     def best_action(self,state):
-        s = torch.tensor(state).view(1, self.state_dim).to(self.device)
         with torch.no_grad():
-            action = self.actor.deterministic_act(s).cpu().numpy()[0]
+            s = torch.tensor(state).view(1, self.state_dim).to(self.device)
+            action = np.argmax(self.actor(s).detach().cpu().numpy())
         return action

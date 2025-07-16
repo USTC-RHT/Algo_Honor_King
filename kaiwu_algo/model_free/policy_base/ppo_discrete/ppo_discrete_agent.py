@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from ppo_discrete_algo import Algo
 from ppo_discrete_config import Config
 from dataclasses import dataclass
+from torch.distributions import Categorical
 
 '''s, a, r, s_next, logprob_a, dw, done'''
 @dataclass
@@ -97,7 +98,7 @@ class Agent:
         # 推理得到的结果已经是概率分布
         with torch.no_grad():
             probs = self.actor(s)
-            action_dist = torch.distributions.Categorical(probs=probs)
+            action_dist = Categorical(probs=probs)
         action = action_dist.sample()
         return action.item(), probs
 
