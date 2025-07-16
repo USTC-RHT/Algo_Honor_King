@@ -140,12 +140,15 @@ class Agent:
     def __init__(self,env):
         torch.manual_seed(0)
         self.config = Config()
+        self.alpha = Config.alpha
+        self.adaptive_alpha = Config.adaptive_alpha
         self.state_dim = env.observation_space.shape[0]
         self.actor_hidden_layers = Config.actor_hidden_layers
         self.critic_hidden_layers = Config.critic_hidden_layers
         self.action_dim = env.action_space.shape[0]
         self.actor_learning_rate = Config.actor_learning_rate
         self.critic_learning_rate = Config.critic_learning_rate
+        self.log_alpha_learning_rate = Config.log_actor_learning_rate
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         '''Build Actor and Critic'''
         self.actor = Actor(self.state_dim,self.actor_hidden_layers,self.action_dim).to(self.device)
@@ -153,14 +156,23 @@ class Agent:
         self.critic = Double_Q_Critic(self.state_dim,self.critic_hidden_layers,self.action_dim).to(self.device)
         self.critic_target = copy.deepcopy(self.critic)
         self.critic_optimizer = torch.optim.Adam(params=self.critic.parameters(), lr = self.critic_learning_rate)
-        self.model = [self.actor,self.critic,self.critic_target]
-        self.optimizer = [self.actor_optimizer,self.critic_optimizer]
+
+        if self.adaptive_alpha:
+            # Target Entropy = −dim(A) (e.g. -6 for HalfCheetah-v2) as given in the paper
+            self.config.target_entropy = torch.tensor(-self.action_dim, dtype=torch.float32, requires_grad=True, device=self.device)
+            # learn log_alpha instead of alpha to ensure : alpha > 0
+            self.log_alpha = torch.nn.Parameter(torch.tensor(np.log(self.alpha), dtype=torch.float32, requires_grad=True, device=self.device))
+            self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.log_alpha_learning_rate)
+
+        self.model = [self.actor,self.critic,self.critic_target,self.log_alpha]
+        self.optimizer = [self.actor_optimizer,self.critic_optimizer,self.log_alpha_optimizer]
         self.algo = Algo(model = self.model, config = self.config,  optimizer = self.optimizer, device = self.device)
 
     def take_action(self,state):
         s = torch.tensor(state).view(1, self.state_dim).to(self.device)
         with torch.no_grad():
-            action, logp_pi_a = self.actor.sample_act(s).cpu().numpy()[0]
+            a, logp_pi_a = self.actor.sample_act(s)
+            action = a.cpu().numpy()[0]
         return action, logp_pi_a
 
     def update(self,transitions):

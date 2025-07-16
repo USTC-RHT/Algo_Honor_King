@@ -9,11 +9,17 @@ class Algo(BaseAlgo):
         self.device = device
         self.tau = config.tau                             
         self.gamma = config.gamma
+        self.adaptive_alpha = config.adaptive_alpha
+        self.target_entropy = config.target_entropy
+        ''' model = [self.actor,self.critic,self.critic_target,self.log_alpha] '''
         self.Actor = model[0].to(self.device)
         self.Critic = model[1].to(self.device)
         self.Critic_Target = model[2].to(self.device)
+        self.log_alpha = model[3].to(self.device)
+        ''' optimizer = [self.actor_optimizer,self.critic_optimizer,self.log_alpha_optimizer] '''
         self.actor_optimizer = optimizer[0]
         self.critic_optimizer = optimizer[1]
+        self.log_alpha_optimizer = optimizer[2]
         self.train_step = 0
 
     def learn(self, list_sample_data):
@@ -32,10 +38,11 @@ class Algo(BaseAlgo):
 
         with torch.no_grad():
             # Compute the target Q
-
-            target_Q1, target_Q2 = self.Critic_Target(next_state, smoothed_target_action)
+            next_action, log_pi_a_next = self.Actor.sample_act(next_state)
+            target_Q1, target_Q2 = self.Critic_Target(next_state, next_action)
             ''' Clipped Double Q-learning '''
-            TD_target = reward + self.gamma * torch.min(target_Q1, target_Q2) * (1 - dw)
+            TD_target = reward + self.gamma * (torch.min(target_Q1, target_Q2) \
+                                            - self.log_alpha.exp() * log_pi_a_next) * (1 - dw)
 
         ''' Critic loss '''
         Q1, Q2 = self.Critic(state,action)
@@ -46,21 +53,31 @@ class Algo(BaseAlgo):
         critic_loss.backward()						# critic反向传播
         self.critic_optimizer.step()                # 更新critic模型参数
 
-        ''' Delayed Policy and Target Net Updates '''
-
+        ''' Freeze critic so you don't waste computational effort computing gradients for them when update actor '''
+        for params in self.Critic.parameters(): params.requires_grad = False
         '''actor loss'''
-        actor_loss = - self.Critic.Q1(state, self.Actor(state))
+        rsample_a, log_pi_a = self.Actor.sample_act(state)
+        current_Q1, current_Q2 = self.Critic(state, rsample_a)
+        rsample_Q = torch.min(current_Q1, current_Q2)
+        actor_loss = self.log_alpha.exp() * log_pi_a - rsample_Q
 
         ''' Optimize the actor '''
         self.actor_optimizer.zero_grad()			# actor梯度清零
         actor_loss.mean().backward()                # actor反向传播
         self.actor_optimizer.step()					# 更新actor模型参数
 
+        for params in self.Critic.parameters(): params.requires_grad = True
+
+        if self.adaptive_alpha:
+            log_alpha_loss = - self.log_alpha.exp() * (log_pi_a + self.target_entropy).detach()
+        
+            ''' Optimize the alpha '''
+            self.log_alpha_optimizer.zero_grad()        # log_alpha梯度清零
+            log_alpha_loss.mean().backward()            # log_alpha反向传播
+            self.log_alpha_optimizer.step()             # 更新log_alpha模型参数
+
         '''Update the frozen target models'''
         with torch.no_grad():
-            for param, target_param in zip(self.Actor.parameters(), self.Actor_Target.parameters()):
-                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
-            
             for param, target_param in zip(self.Critic.parameters(), self.Critic_Target.parameters()):
                 target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
         

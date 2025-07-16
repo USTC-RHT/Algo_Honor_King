@@ -18,11 +18,11 @@ args = parser.parse_args()
 
 print(f"环境: {args.env_name}, 随机种子: {args.seed}")
 
-algo_name = 'sac'
-root = os.path.abspath(os.path.join(policy_base_dir, "sac"))
+algo_name = 'sac_continuous'
+root = os.path.abspath(os.path.join(policy_base_dir, "sac_continuous"))
 sys.path.append(root)
-from sac_config import Config
-from sac_agent import Agent, ReplayBuffer
+from sac_continuous_config import Config
+from sac_continuous_agent import Agent, ReplayBuffer
 
 # env_name = 'Pendulum-v1'
 # env_name = 'LunarLanderContinuous-v3'
@@ -58,7 +58,7 @@ while total_steps < Config.Max_train_steps:
             action = env.action_space.sample()
             a = action / max_action
         else: 
-            a = agent.take_action(state)
+            a, _ = agent.take_action(state)
             action = a * max_action
         next_state, reward, dw, truncated, _ = env.step(action)
         reward = reward_shaping(reward, env_name)
@@ -66,14 +66,9 @@ while total_steps < Config.Max_train_steps:
         replaybuffer.add(state, a, reward, next_state, dw)
         episode_return += reward
         if total_steps >= 2 * max_ep_steps and total_steps % Config.update_every == 0:
-            actor_loss = None
-            critic_loss = None
             for _ in range(Config.update_every):
                 transitions = replaybuffer.sample(Config.batch_size)
-                a_loss, c_loss = agent.update(transitions)
-                if actor_loss is None:
-                    actor_loss = a_loss
-                    critic_loss = c_loss
+                actor_loss, critic_loss = agent.update(transitions)
             writer.add_scalar('actor_loss', actor_loss, global_step=total_steps)
             writer.add_scalar('critic_loss', critic_loss, global_step=total_steps)
         state = next_state
@@ -81,8 +76,6 @@ while total_steps < Config.Max_train_steps:
         '''Eval & Record 
         ep_r: episode reward'''
         if total_steps % Config.eval_interval == 0:
-            '''探索噪声衰减'''
-            agent.explore_noise *= Config.explore_noise_decay
             score = evaluate_policy(eval_env, agent, turns=3)
             writer.add_scalar('ep_r', score, global_step=total_steps)
 
