@@ -53,13 +53,20 @@ while total_steps < Config.Max_train_steps:
     env_seed += 1
     done = False
     while not done:
-        if total_steps < 5 * max_ep_steps: 
-            # steps for random policy to explore 随机探索阶段
-            action = env.action_space.sample()
-            a = action / max_action
-        else: 
-            a, _ = agent.take_action(state)
-            action = a * max_action
+        if algo_name == 'sac_continuous':
+            if total_steps < 5 * max_ep_steps: 
+                # steps for random policy to explore 随机探索阶段
+                action = env.action_space.sample()
+                a = action / max_action
+            else: 
+                a, _ = agent.take_action(state)
+                action = a * max_action
+        elif algo_name == 'sac_discrete':
+            if total_steps < Config.random_steps: 
+                action = env.action_space.sample()
+            else: 
+                action = agent.take_action(state)
+            a = action
         next_state, reward, dw, truncated, _ = env.step(action)
         reward = reward_shaping(reward, env_name)
         done = dw or truncated
