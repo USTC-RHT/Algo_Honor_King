@@ -105,6 +105,7 @@ class Agent:
         self.actor_hidden_layers = Config.actor_hidden_layers
         self.critic_hidden_layers = Config.critic_hidden_layers
         self.action_dim = env.action_space.n
+        self.config.action_dim = self.action_dim
         self.actor_learning_rate = Config.actor_learning_rate
         self.critic_learning_rate = Config.critic_learning_rate
         self.log_alpha_learning_rate = Config.log_actor_learning_rate
@@ -117,8 +118,9 @@ class Agent:
         self.critic_optimizer = torch.optim.Adam(params=self.critic.parameters(), lr = self.critic_learning_rate)
 
         if self.adaptive_alpha:
-            # Target Entropy = −dim(A) (e.g. -6 for HalfCheetah-v2) as given in the paper
-            self.config.target_entropy = torch.tensor(-self.action_dim, dtype=torch.float32, requires_grad=True, device=self.device)
+            # Use 0.6 because the recommended 0.98 will cause alpha explosion.
+            ''' -np.log(1 / self.action_dim)是均匀分布的熵 '''
+            self.config.target_entropy = 0.6 * (-np.log(1 / self.action_dim))  # H(discrete)>0
             # learn log_alpha instead of alpha to ensure : alpha > 0
             self.log_alpha = torch.nn.Parameter(torch.tensor(np.log(self.alpha), dtype=torch.float32, requires_grad=True, device=self.device))
             self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.log_alpha_learning_rate)

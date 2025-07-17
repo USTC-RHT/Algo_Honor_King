@@ -30,15 +30,15 @@ parser = argparse.ArgumentParser()
 if algo_name == 'sac_continuous':
     parser.add_argument('--env_name', type=str, default='LunarLanderContinuous-v3', help='环境名称')
     parser.add_argument('--seed', type=int, default=0, help='随机种子')
-    max_action = float(env.action_space.high[0])
 elif algo_name == 'sac_discrete':
-    parser.add_argument('--env_name', type=str, default='CartPole-v1', help='环境名称')
+    parser.add_argument('--env_name', type=str, default='LunarLander-v3', help='环境名称')
     parser.add_argument('--seed', type=int, default=0, help='随机种子')
 
 args = parser.parse_args()
 print(f"环境: {args.env_name}, 随机种子: {args.seed}")
 
 # env_name = 'Pendulum-v1'
+# env_name = 'LunarLander-v3'
 # env_name = 'LunarLanderContinuous-v3'
 # env_name = 'BipedalWalkerHardcore-v3'
 env_name = args.env_name
