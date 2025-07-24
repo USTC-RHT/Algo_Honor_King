@@ -1,16 +1,11 @@
+from mpe2 import simple_adversary_v3
 
-import torch
-from torch.distributions import Categorical
+env = simple_adversary_v3.parallel_env(continuous_actions = True)
+observations, infos = env.reset()
 
-# 假设 batch_size = 3，action_dim = 4
-probs = torch.tensor([
-    [1, 0, 0, 0],   # 第一个样本的动作分布
-    [0.25, 0.25, 0.25, 0.25],  # 第二个样本（最大熵）
-    [0.9, 0.05, 0.03, 0.02],   # 第三个样本（最小熵）
-])
+while env.agents:
+    # this is where you would insert your policy
+    actions = {agent: env.action_space(agent).sample() for agent in env.agents}
 
-dist = Categorical(probs=probs)
-entropy = dist.entropy()
-
-print("entropy:", entropy)
-print("entropy shape:", entropy.shape)
+    observations, rewards, terminations, truncations, infos = env.step(actions)
+env.close()

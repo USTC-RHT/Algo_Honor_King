@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 import math
+import copy
 
 def moving_average(a, window_size):
     cumulative_sum = np.cumsum(np.insert(a, 0, 0)) 
@@ -75,6 +76,25 @@ def evaluate_policy_ppo_continuous(env, agent, turns = 3):
     agent.actor.train()
     return int(total_scores/turns)
 
+# 用于 MADDPG 中的策略评估
+'''episode_limit 评估时每一个episode的最大步数'''
+def evaluate_policy_maddpg(env, agent_names, agent_n, turns = 3, episode_limit = 25):
+    total_score = [0] * len(agent_names)
+    for _ in range(turns):
+        obs_n, _ = env.reset()
+        episode_reward = [0] * len(agent_names)
+        for _ in range(episode_limit):
+            a_n = {name: agent_n[i].best_action(obs_n[name]).astype(np.float32) \
+                    for i,name in enumerate(agent_names)}
+            obs_next_n, reward_n, dw_n, truncated_n, _ = env.step(copy.deepcopy(a_n))
+            for i, name in enumerate(agent_names):
+                episode_reward[i] += reward_n[name]
+            obs_n = obs_next_n
+            done = any(dw_n.values()) or any(truncated_n.values())
+            if done: break
+        total_score = [total_score[i] + episode_reward[i] for i in range(len(agent_names))]
+    return [score / turns for score in total_score]
+
 # 用于 noisy_dqn中的神经网络构造
 class NoisyLinear(nn.Module):
     '''From https://github.com/Lizhi-sjtu/DRL-code-pytorch/blob/main/3.Rainbow_DQN/network.py'''
@@ -125,20 +145,17 @@ class NoisyLinear(nn.Module):
         x = torch.randn(size)
         x = x.sign().mul(x.abs().sqrt())
         return x
-    
+
+'''利用 Gumbel-Softmax 的方法来得到离散分布的近似采样 用于MADDPG算法'''
 def onehot_from_logits(logits, eps=0.01):
-    ''' 生成最优动作的独热(one-hot)形式 '''
-    argmax_acs = (logits == logits.max(1, keepdim=True)[0]).float()
-    # 生成随机动作,转换成独热形式
-    rand_acs = torch.autograd.Variable(torch.eye(logits.shape[1])[[
-        np.random.choice(range(logits.shape[1]), size=logits.shape[0])
-    ]],
-                                       requires_grad=False).to(logits.device)
-    # 通过epsilon-贪婪算法来选择用哪个动作
-    return torch.stack([
-        argmax_acs[i] if r > eps else rand_acs[i]
-        for i, r in enumerate(torch.rand(logits.shape[0]))
-    ])
+    # 获取最大值索引并生成one-hot
+    argmax_actions = torch.zeros_like(logits).scatter(1, logits.argmax(dim=1, keepdim=True), 1.0)
+
+    # 随机选择动作，并转换成one-hot形式
+    random_actions = torch.eye(logits.shape[1], device=logits.device)[torch.randint(0, logits.shape[1], (logits.shape[0],))]
+
+    # epsilon-贪婪选择
+    return torch.where(torch.rand(logits.shape[0], device=logits.device) > eps, argmax_actions, random_actions)
 
 
 def sample_gumbel(shape, delta=1e-20):
@@ -148,15 +165,17 @@ def sample_gumbel(shape, delta=1e-20):
 
 
 def gumbel_softmax_sample(logits, temperature):
-    """ 从Gumbel-Softmax分布中采样"""
+    """ 从Gumbel-Softmax分布中采样 """
     y = logits + sample_gumbel(logits.shape).to(logits.device)
     return F.softmax(y / temperature, dim=1)
 
+
 def gumbel_softmax(logits, temperature=1.0):
     """从Gumbel-Softmax分布中采样,并进行离散化"""
-    y = gumbel_softmax_sample(logits, temperature)
-    y_hard = onehot_from_logits(y)
-    y = (y_hard.to(logits.device) - y).detach() + y
-    # 返回一个y_hard的独热量,但是它的梯度是y,我们既能够得到一个与环境交互的离散动作,又可以
-    # 正确地反传梯度
+    y_soft = gumbel_softmax_sample(logits, temperature)
+    y_hard = onehot_from_logits(y_soft)
+
+    '''直通估计器(Straight-Through Estimator,STE    ):
+    前向传播时使用y_hard, 反向传播时使用y_soft的梯度'''
+    y = y_soft + (y_hard - y_soft).detach()
     return y
