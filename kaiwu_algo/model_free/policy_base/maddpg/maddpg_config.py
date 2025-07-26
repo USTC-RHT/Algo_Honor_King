@@ -12,10 +12,13 @@ class Config:
     batch_size = 1024                      # 批次大小
     update_every = 1                       # 训练频率
     agent_names = []                       # agent名字(在 maddpg_main中定义)
+    obs_dim_n = []
+    action_dim_n = []
+    agent_num = 0                          
     min_action = 0                         # (环境中)动作的最小值(在 maddpg_main中定义)
-    max_action = 0                         # (环境中)动作的最大值(在 maddpg_main中定义)
+    max_action = 1                         # (环境中)动作的最大值(在 maddpg_main中定义)
     use_orthogonal_init = True             # 神经网络是否使用正交初始化
-    eval_interval = 5000                   # 评估频率
+    eval_interval = 1000                   # 评估频率
     noise = 0.2                            # 探索噪声
     noise_init = 0.2                       # 探索噪声的初始值
     noise_min = 0.05                       # 探索噪声的最小值
