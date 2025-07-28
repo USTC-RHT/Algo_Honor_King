@@ -10,36 +10,57 @@ from dataclasses import dataclass
 
 @dataclass
 class SampleData:
-    obs: dict
-    action: dict
-    reward: dict
-    next_obs: dict
-    dw: dict
+    obs: np
+    action: np
+    reward: np
+    next_obs: np
+    dw: np
 
 # ReplayBuffer
 class ReplayBuffer():
-    
     ''' 经验回放池 
         Max number of transitions to store in the buffer. 
         When the buffer overflows the old memories are dropped.
     '''
-    def __init__(self, capacity):
-        self.buffer = collections.deque(maxlen=capacity)  # 队列,先进先出
+    def __init__(self, Config):
+        self.agent_num = Config.agent_num
+        self.buffer_size = Config.buffer_size
+        self.batch_size = Config.batch_size
+        self.count = 0
+        self.current_size = 0
+        self.buffer_obs_n, self.buffer_a_n, self.buffer_r_n, self.buffer_s_next_n, self.buffer_done_n = [], [], [], [], []
+        for agent_id in range(self.agent_num):
+            self.buffer_obs_n.append(np.empty((self.buffer_size, Config.obs_dim_n[agent_id])))
+            self.buffer_a_n.append(np.empty((self.buffer_size, Config.action_dim_n[agent_id])))
+            self.buffer_r_n.append(np.empty((self.buffer_size, 1)))
+            self.buffer_s_next_n.append(np.empty((self.buffer_size, Config.obs_dim_n[agent_id])))
+            self.buffer_done_n.append(np.empty((self.buffer_size, 1)))
 
-    def add(self, state, action, reward, next_state, dw):  # 将数据加入buffer
-        sample_data = SampleData(state, action, reward, next_state, dw)
-        self.buffer.append(sample_data)
-        return
+    def store_transition(self, obs_n, a_n, r_n, obs_next_n, done_n):
+        for agent_id in range(self.agent_num):
+            self.buffer_obs_n[agent_id][self.count] = obs_n[agent_id]
+            self.buffer_a_n[agent_id][self.count] = a_n[agent_id]
+            self.buffer_r_n[agent_id][self.count] = r_n[agent_id]
+            self.buffer_s_next_n[agent_id][self.count] = obs_next_n[agent_id]
+            self.buffer_done_n[agent_id][self.count] = done_n[agent_id]
+        self.count = (self.count + 1) % self.buffer_size
+        self.current_size = min(self.current_size + 1, self.buffer_size)
 
-    def sample(self, batch_size):  # 从buffer中采样数据,数量为batch_size
-        transitions = random.sample(self.buffer, batch_size)
-        return transitions
+    def sample(self):
+        index = np.random.choice(self.current_size, size=self.batch_size, replace=False) # 不允许重复抽样
+        batch_obs_n, batch_a_n, batch_r_n, batch_obs_next_n, batch_done_n = [], [], [], [], []
+        for agent_id in range(self.agent_num):
+            batch_obs_n.append(torch.tensor(self.buffer_obs_n[agent_id][index], dtype=torch.float))
+            batch_a_n.append(torch.tensor(self.buffer_a_n[agent_id][index], dtype=torch.float))
+            batch_r_n.append(torch.tensor(self.buffer_r_n[agent_id][index], dtype=torch.float))
+            batch_obs_next_n.append(torch.tensor(self.buffer_s_next_n[agent_id][index], dtype=torch.float))
+            batch_done_n.append(torch.tensor(self.buffer_done_n[agent_id][index], dtype=torch.float))
 
-    def size(self):  # 目前buffer中数据的数量
-        return len(self.buffer)
+        return batch_obs_n, batch_a_n, batch_r_n, batch_obs_next_n, batch_done_n
 
 # 正交初始化
 def orthogonal_init(layer, gain=1.0):
+    '''增益(gain) 控制正交矩阵的幅度'''
     for name, param in layer.named_parameters():
         if 'bias' in name:
             nn.init.constant_(param, 0)
@@ -48,7 +69,7 @@ def orthogonal_init(layer, gain=1.0):
 
 # 策略网络构造
 class Actor(torch.nn.Module):
-    def __init__(self, obs_dim, hid_shape, action_dim, action_range, use_orthogonal_init = True):
+    def __init__(self, obs_dim, hid_shape, action_dim, max_action, use_orthogonal_init = True):
         super(Actor, self).__init__()
         layers = []
         layer_shape = [obs_dim] + list(hid_shape) + [action_dim]
@@ -66,11 +87,12 @@ class Actor(torch.nn.Module):
             for layer in self.Net:
                 if isinstance(layer, nn.Linear):
                     orthogonal_init(layer)
-        self.min_action, self.max_action = action_range 
+        self.max_action = max_action
 
     def forward(self, x):
         ''' 映射到自定义的动作空间范围内 '''
-        return 0.5 * (self.max_action - self.min_action) * (self.Net(x) + 1) + self.min_action
+        # return 0.5 * (self.max_action - self.min_action) * (self.Net(x) + 1) + self.min_action
+        return self.max_action * self.Net(x)
     
     def transform_sample_data(self, list_sample_data, device):
         State = []
@@ -116,30 +138,25 @@ class Critic(torch.nn.Module):
     
 '''单个智能体对应的类'''
 class Agent:
-    def __init__(self,env,agent_name):
-        torch.manual_seed(0)
-        self.obs_dim_total = 0
-        self.action_dim_total = 0
-        self.agent_names = Config.agent_names
-        for name in Config.agent_names:
-            self.obs_dim_total += env.observation_space(name).shape[0]
-            self.action_dim_total += env.action_space(name).shape[0]
-        self.agent_name = agent_name
+    def __init__(self,agent_id):
+        self.obs_dim_total = sum(Config.obs_dim_n)
+        self.action_dim_total = sum(Config.action_dim_n)
+        self.agent_id = agent_id
         '''MPE 环境的调用方式'''
-        self.obs_dim = env.observation_space(agent_name).shape[0]
-        self.action_dim = env.action_space(agent_name).shape[0]
+        self.obs_dim = Config.obs_dim_n[agent_id]
+        self.action_dim = Config.action_dim_n[agent_id]
         self.actor_hidden_layers = Config.actor_hidden_layers
         self.critic_hidden_layers = Config.critic_hidden_layers
         self.use_orthogonal_init = Config.use_orthogonal_init
-        self.min_action = Config.min_action
+        # self.min_action = Config.min_action
         self.max_action = Config.max_action
-        self.action_range = [self.min_action, self.max_action]
+        # self.action_range = [self.min_action, self.max_action]
         self.noise = Config.noise
         self.actor_learning_rate = Config.actor_learning_rate
         self.critic_learning_rate = Config.critic_learning_rate
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         '''Build Actor and Critic'''
-        self.actor = Actor(self.obs_dim,self.actor_hidden_layers,self.action_dim,self.action_range,self.use_orthogonal_init).to(self.device)
+        self.actor = Actor(self.obs_dim,self.actor_hidden_layers,self.action_dim,self.max_action,self.use_orthogonal_init).to(self.device)
         self.actor_target = copy.deepcopy(self.actor)
         self.actor_optimizer = torch.optim.Adam(params=self.actor.parameters(), lr = self.actor_learning_rate)
         self.critic = Critic(self.obs_dim_total,self.critic_hidden_layers,self.action_dim_total,self.use_orthogonal_init).to(self.device)
@@ -150,19 +167,18 @@ class Agent:
         self.algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
 
     def take_action(self,obs):
-        s = torch.tensor(obs).view(1, self.obs_dim).to(self.device)
+        s = torch.tensor(obs, dtype=torch.float32).view(1, self.obs_dim).to(self.device)
         with torch.no_grad():
             action = self.actor(s).cpu().numpy()[0]
-            
             noise = np.random.normal(0, self.max_action * self.noise, size=self.action_dim)
-        return (action + noise).clip(self.min_action, self.max_action)
+        return (action + noise).clip(-self.max_action, self.max_action)
 
     def update(self,transitions,agent_n):
-        actor_loss, critic_loss = self.algo.learn(transitions,agent_n,self.agent_names,self.agent_name)
+        actor_loss, critic_loss = self.algo.learn(transitions,agent_n,self.agent_id)
         return actor_loss, critic_loss
     
     def best_action(self,obs):
-        s = torch.tensor(obs).view(1, self.obs_dim).to(self.device)
+        s = torch.tensor(obs, dtype=torch.float32).view(1, self.obs_dim).to(self.device)
         with torch.no_grad():
             action = self.actor(s).cpu().numpy()[0]
         return action

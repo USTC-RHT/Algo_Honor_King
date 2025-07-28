@@ -78,21 +78,20 @@ def evaluate_policy_ppo_continuous(env, agent, turns = 3):
 
 # 用于 MADDPG 中的策略评估
 '''episode_limit 评估时每一个episode的最大步数'''
-def evaluate_policy_maddpg(env, agent_names, agent_n, turns = 3, episode_limit = 25):
-    total_score = [0] * len(agent_names)
+def evaluate_policy_maddpg(env, agent_num, agent_n, turns = 3, episode_limit = 25):
+    total_score = [0] * agent_num
     for _ in range(turns):
-        obs_n, _ = env.reset()
-        episode_reward = [0] * len(agent_names)
+        obs_n = env.reset()
+        episode_reward = [0] * agent_num
         for _ in range(episode_limit):
-            a_n = {name: agent_n[i].best_action(obs_n[name]).astype(np.float32) \
-                    for i,name in enumerate(agent_names)}
-            obs_next_n, reward_n, dw_n, truncated_n, _ = env.step(copy.deepcopy(a_n))
-            for i, name in enumerate(agent_names):
-                episode_reward[i] += reward_n[name]
+            a_n = [agent_n[i].best_action(obs_n[i]).astype(np.float32) for i in range(agent_num)]
+            obs_next_n, reward_n, dw_n, _ = env.step(copy.deepcopy(a_n))
+            for i in range(agent_num):
+                episode_reward[i] += reward_n[i]
             obs_n = obs_next_n
-            done = any(dw_n.values()) or any(truncated_n.values())
+            done = any(dw_n)
             if done: break
-        total_score = [total_score[i] + episode_reward[i] for i in range(len(agent_names))]
+        total_score = [total_score[i] + episode_reward[i] for i in range(agent_num)]
     return [score / turns for score in total_score]
 
 # 用于 noisy_dqn中的神经网络构造

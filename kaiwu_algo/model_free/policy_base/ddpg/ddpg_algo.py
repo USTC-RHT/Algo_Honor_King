@@ -36,19 +36,19 @@ class Algo(BaseAlgo):
             '''dw(dead and win) for TD_target'''
             TD_target = reward + self.gamma * next_value * (1 - dw)
 
-        '''actor loss'''
-        actor_loss = - self.Critic(state, self.Actor(state))
-
         '''critic loss'''
         critic_loss = F.mse_loss(self.Critic(state,action),TD_target)
-
-        self.actor_optimizer.zero_grad()			# actor梯度清零
-        actor_loss.mean().backward()                # actor反向传播
-        self.actor_optimizer.step()					# 更新actor模型参数
 
         self.critic_optimizer.zero_grad()           # critic梯度清零
         critic_loss.backward()						# critic反向传播
         self.critic_optimizer.step()                # 更新critic模型参数
+
+        '''actor loss'''
+        actor_loss = - self.Critic(state, self.Actor(state))
+
+        self.actor_optimizer.zero_grad()			# actor梯度清零
+        actor_loss.mean().backward()                # actor反向传播
+        self.actor_optimizer.step()					# 更新actor模型参数
 
         '''Update the frozen target models'''
         with torch.no_grad():
