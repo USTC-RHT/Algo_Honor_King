@@ -21,7 +21,7 @@ from maddpg_agent import Agent, ReplayBuffer
 from common.rl_utils import evaluate_policy_maddpg
 
 env_name = 'simple_spread'
-env_name = 'simple_speaker_listener'
+# env_name = 'simple_adversary'
 env = make_env(env_name, discrete=False)
 eval_env = make_env(env_name, discrete=False)
 '''设置随机数种子,提升训练的可复现性'''
@@ -52,11 +52,15 @@ writer = SummaryWriter(log_dir=logdir)
 noise_decay = (Config.noise_init - Config.noise_min) / Config.noise_decay_steps
 
 total_steps = 0
+score_list = evaluate_policy_maddpg(eval_env, agent_num, agent_n, 3, Config.episode_limit)
+print(f'total_steps{total_steps}:{score_list[0]}')
+for i in range(agent_num):
+    writer.add_scalar(f'{i}/ep_r', score_list[i], global_step=total_steps)
+
 while total_steps < Config.Max_train_steps:
     episode_return = 0
     '''obs_n是list类型 以agent_id为索引 每个元素均为numpy数组'''
     obs_n = env.reset()
-    env_seed += 1
     done = False
     for _ in range(Config.episode_limit):
         if done: break
@@ -65,6 +69,13 @@ while total_steps < Config.Max_train_steps:
         next_obs_n, reward_n, dw_n, _ = env.step(copy.deepcopy(action_n))
         done = any(dw_n)
         replaybuffer.store_transition(obs_n, action_n, reward_n, next_obs_n, dw_n)
+
+        # Decay noise
+        if Config.use_noise_decay and Config.noise > Config.noise_min:
+            Config.noise -= noise_decay
+            for i in range(agent_num):
+                agent_n[i].noise = Config.noise
+
         # 当buffer数据的数量超过一定值后进行训练
         if replaybuffer.current_size > Config.minimal_size \
         and total_steps % Config.update_every == 0:
@@ -73,17 +84,14 @@ while total_steps < Config.Max_train_steps:
                 actor_loss, critic_loss = agent_n[i].update(transitions,agent_n)
                 writer.add_scalar(f'{i}/actor_loss', actor_loss, global_step=total_steps)
                 writer.add_scalar(f'{i}/critic_loss', critic_loss, global_step=total_steps)
+
         obs_n = next_obs_n
-        # Decay noise
-        if Config.use_noise_decay and Config.noise > Config.noise_min:
-            Config.noise -= noise_decay
-            for i in range(agent_num):
-                agent_n[i].noise = Config.noise
         total_steps += 1
         '''Eval & Record 
         ep_r: episode reward'''
         if total_steps % Config.eval_interval == 0:
             score_list = evaluate_policy_maddpg(eval_env, agent_num, agent_n, 3, Config.episode_limit)
+            print(f'total_steps{total_steps}:{score_list[0]}')
             for i in range(agent_num):
                 writer.add_scalar(f'{i}/ep_r', score_list[i], global_step=total_steps)
 env.close()

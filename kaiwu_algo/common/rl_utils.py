@@ -5,6 +5,15 @@ from torch import nn
 import math
 import copy
 
+# 正交初始化
+def orthogonal_init(layer, gain=1.0):
+    '''增益(gain) 控制正交矩阵的幅度'''
+    for name, param in layer.named_parameters():
+        if 'bias' in name:
+            nn.init.constant_(param, 0)
+        elif 'weight' in name:
+            nn.init.orthogonal_(param, gain=gain)
+            
 def moving_average(a, window_size):
     cumulative_sum = np.cumsum(np.insert(a, 0, 0)) 
     middle = (cumulative_sum[window_size:] - cumulative_sum[:-window_size]) / window_size
