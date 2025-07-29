@@ -18,7 +18,7 @@ root1 = os.path.abspath(os.path.join(policy_base_dir, "mappo"))
 sys.path.append(root1)
 from mappo_config import Config
 from mappo_agent import Agent
-from common.rl_utils import evaluate_policy_maddpg
+from common.rl_utils import evaluate_policy_mappo_smac
 
 '''设置随机数种子,提升训练的可复现性'''
 seed = 0
@@ -37,15 +37,16 @@ eval_env = StarCraft2Env(map_name=env_name, seed=seed)
 
 '''获取环境相关信息'''
 env_info = env.get_env_info()
-Config.agent_num = env_info["n_agents"]
+agent_num = env_info["n_agents"]
+Config.agent_num = agent_num
 Config.state_dim = env_info["state_shape"]
-Config.obs_dim_n = [env_info["obs_shape"]] * Config.agent_num
-Config.action_dim_n = [env_info["n_actions"]] * Config.agent_num
+Config.obs_dim_n = [env_info["obs_shape"]] * agent_num
+Config.action_dim_n = [env_info["n_actions"]] * agent_num
 Config.episode_limit = env_info["episode_limit"]
 
 '''初始化智能体与回放池'''
 agent_n = []
-for agent_id in range(Config.agent_num):
+for agent_id in range(agent_num):
     agent_n.append(Agent(agent_id))
 
 '''初始化tensorboard'''
@@ -57,8 +58,16 @@ writer = SummaryWriter(log_dir=logdir)
 noise_decay = (Config.noise_init - Config.noise_min) / Config.noise_decay_steps
 
 total_steps = 0
+evaluate_num = -1
 while total_steps < Config.Max_train_steps:
-    episode_return = 0
+    '''Eval & Record 
+    ep_r: episode reward'''
+    if total_steps // Config.evaluate_interval > evaluate_num:
+        score_list = evaluate_policy_maddpg(eval_env, agent_num, agent_n, 3, Config.episode_limit)
+        for i in range(agent_num):
+            writer.add_scalar(f'{i}/ep_r', score_list[i], global_step=total_steps)
+        evaluate_num += 1
+
     obs_n = env.reset()
     env_seed += 1
     done = False
@@ -84,10 +93,5 @@ while total_steps < Config.Max_train_steps:
             for i in range(agent_num):
                 agent_n[i].noise = Config.noise
         total_steps += 1
-        '''Eval & Record 
-        ep_r: episode reward'''
-        if total_steps % Config.eval_interval == 0:
-            score_list = evaluate_policy_maddpg(eval_env, agent_num, agent_n, 3, Config.episode_limit)
-            for i in range(agent_num):
-                writer.add_scalar(f'{i}/ep_r', score_list[i], global_step=total_steps)
+
 env.close()

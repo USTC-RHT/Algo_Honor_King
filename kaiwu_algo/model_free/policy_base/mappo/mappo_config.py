@@ -16,6 +16,7 @@ class Config:
     Advantage_Normal = False               # 是否进行优势的归一化
     eval_interval = 1000                   # 评估频率
     max_traj_len = 2048                    # 长轨迹的最大长度
+    use_agent_specific = True              # 是否在Critic模型输入中增加智能体特有的观测
     ''' 以下参数均在mappo_main.py中定义 '''
     agent_num = 0                          # 智能体的数量
     state_dim = 0                          # 全局状态维度
