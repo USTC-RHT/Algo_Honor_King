@@ -114,9 +114,9 @@ def evaluate_policy_mappo(env, agent_num, agent_n, episode_limit, turns = 32):
         env.reset()
         for _ in range(episode_limit):
             obs_n = env.get_obs()  # obs_n.shape=(N,obs_dim)
-            avail_a_n = env.get_avail_actions()  # Get available actions of N agents, avail_a_n.shape=(N,action_dim)
-
-            a_n = [agent_n[i].best_action(obs_n[i],avail_a_n[i]).astype(np.float32) for i in range(agent_num)]
+            avail_a_n = env.get_avail_actions()  # avail_a_n.shape=(N,action_dim)
+            a_n = [agent_n[i].best_action(obs_n[i],avail_a_n[i]) for i in range(agent_num)]
+            a_n = np.array(a_n)
 
             r, done, info = env.step(a_n)
             win_tag = True if done and 'battle_won' in info and info['battle_won'] else False
@@ -128,8 +128,6 @@ def evaluate_policy_mappo(env, agent_num, agent_n, episode_limit, turns = 32):
     win_rate = win_times / turns
     evaluate_reward = evaluate_reward / turns
     return win_rate, evaluate_reward
-
-
 
 
 # 用于 noisy_dqn中的神经网络构造

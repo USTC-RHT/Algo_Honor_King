@@ -9,9 +9,9 @@ from common.rl_utils import orthogonal_init
 class ReplayBuffer:
     def __init__(self):
         self.N = Config.agent_num
-        self.obs_dim_n = Config.obs_dim_n
+        self.obs_dim = Config.obs_dim_n[0]
         self.state_dim = Config.state_dim
-        self.action_dim_n = Config.action_dim_n
+        self.action_dim = Config.action_dim_n[0]
         self.episode_limit = Config.episode_limit
         self.batch_size = Config.batch_size
         self.episode_num = 0
@@ -20,10 +20,10 @@ class ReplayBuffer:
         self.reset_buffer()
 
     def reset_buffer(self):
-        self.buffer = {'obs_n': np.zeros([self.batch_size, self.episode_limit, self.N, self.obs_dim_n]),
-                       's': np.zeros([self.batch_size, self.episode_limit, self.state_dim]),
+        self.buffer = {'obs_n': np.zeros([self.batch_size, self.episode_limit, self.N, self.obs_dim]),
+                       'state': np.zeros([self.batch_size, self.episode_limit, self.state_dim]),
                        'v_n': np.zeros([self.batch_size, self.episode_limit + 1, self.N]),
-                       'avail_a_n': np.ones([self.batch_size, self.episode_limit, self.N, self.action_dim_n]),  # Note: We use 'np.ones' to initialize 'avail_a_n'
+                       'avail_a_n': np.ones([self.batch_size, self.episode_limit, self.N, self.action_dim]),  # Note: We use 'np.ones' to initialize 'avail_a_n'
                        'a_n': np.zeros([self.batch_size, self.episode_limit, self.N]),
                        'logprob_a_n': np.zeros([self.batch_size, self.episode_limit, self.N]),
                        'r': np.zeros([self.batch_size, self.episode_limit, self.N]),
@@ -33,9 +33,9 @@ class ReplayBuffer:
         self.episode_num = 0
         self.max_episode_len = 0
 
-    def store_transition(self, episode_step, obs_n, s, v_n, avail_a_n, a_n, logprob_a_n, r, dw):
+    def store_transition(self, episode_step, obs_n, state, v_n, avail_a_n, a_n, logprob_a_n, r, dw):
         self.buffer['obs_n'][self.episode_num][episode_step] = obs_n
-        self.buffer['s'][self.episode_num][episode_step] = s
+        self.buffer['state'][self.episode_num][episode_step] = state
         self.buffer['v_n'][self.episode_num][episode_step] = v_n
         self.buffer['avail_a_n'][self.episode_num][episode_step] = avail_a_n
         self.buffer['a_n'][self.episode_num][episode_step] = a_n
@@ -70,7 +70,7 @@ class Actor(torch.nn.Module):
         layers = []
         layer_shape = [actor_input_dim] + list(hid_shape) + [action_dim]
         '''设置激活函数为 ReLU '''
-        activation = nn.ReLU()
+        activation = nn.ReLU
         '''Build networks with For loop'''
         for j in range(len(layer_shape)-1):
             if j < len(layer_shape) - 2: 
@@ -84,11 +84,11 @@ class Actor(torch.nn.Module):
                 if isinstance(layer, nn.Linear):
                     orthogonal_init(layer)       
 
-    def forward(self, x, avail_a_n):
+    def forward(self, x, avail_a):
         logits = self.model(x)
         '''Mask the unavailable actions'''
-        logits[avail_a_n == 0] = -1e10
-        probs = torch.softmax(x, dim=-1)
+        logits[avail_a == 0] = -1e10
+        probs = torch.softmax(logits, dim=-1)
         return probs
     
     def transform_sample_data(self, list_sample_data, device):
@@ -160,25 +160,34 @@ class Agent:
         self.optimizer = [self.actor_optimizer,self.critic_optimizer]
         self.algo = Algo(model = self.model, config = Config, optimizer = self.optimizer, device = self.device)
 
-
-    def take_action(self,obs):
-        s = torch.tensor(obs).view(1, self.obs_dim).to(self.device)
-        # 推理得到的结果已经是概率分布
+    def take_action(self,obs,avail_a):
         with torch.no_grad():
-            probs = self.actor(s)
+            obs = torch.tensor(obs).view(1, self.obs_dim).to(self.device)
+            avail_a = torch.tensor(avail_a).view(1, self.action_dim).to(self.device)
+            probs = self.actor(obs, avail_a)
             action_dist = Categorical(probs=probs)
         action = action_dist.sample()
-        return action.item(), probs
-
+        log_prob = action_dist.log_prob(action)
+        return [action.item(), log_prob.item()]
+    
+    def get_value(self,state,obs):
+        with torch.no_grad():    
+            if self.use_agent_specific:  # Add local obs of the agent
+                critic_input = torch.tensor(np.concatenate([state, obs]), dtype=torch.float32)
+            else:
+                critic_input = torch.tensor(state, dtype=torch.float32)
+            value = self.critic(critic_input)
+            return value.cpu().numpy().item()
 
     def update(self,Long_Traj):
         actor_loss, critic_loss = self.algo.learn(Long_Traj)
         return actor_loss, critic_loss
     
-    def best_action(self,obs):
+    def best_action(self,obs,avail_a):
         with torch.no_grad():
-            s = torch.tensor(obs).view(1, self.obs_dim).to(self.device)
-            action = np.argmax(self.actor(s).detach().cpu().numpy())
+            obs = torch.tensor(obs).view(1, self.obs_dim).to(self.device)
+            avail_a = torch.tensor(avail_a).view(1, self.action_dim).to(self.device)
+            action = np.argmax(self.actor(obs, avail_a).cpu().numpy())
         return action
     
 
