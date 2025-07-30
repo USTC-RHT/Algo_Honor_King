@@ -18,7 +18,7 @@ root1 = os.path.abspath(os.path.join(policy_base_dir, "mappo"))
 sys.path.append(root1)
 from mappo_config import Config
 from mappo_agent import Agent
-from common.rl_utils import evaluate_policy_mappo_smac
+from common.rl_utils import evaluate_policy_mappo
 
 '''设置随机数种子,提升训练的可复现性'''
 seed = 0
@@ -60,38 +60,25 @@ noise_decay = (Config.noise_init - Config.noise_min) / Config.noise_decay_steps
 total_steps = 0
 evaluate_num = -1
 while total_steps < Config.Max_train_steps:
-    '''Eval & Record 
-    ep_r: episode reward'''
+    ''' Eval & Record '''
     if total_steps // Config.evaluate_interval > evaluate_num:
-        score_list = evaluate_policy_maddpg(eval_env, agent_num, agent_n, 3, Config.episode_limit)
-        for i in range(agent_num):
-            writer.add_scalar(f'{i}/ep_r', score_list[i], global_step=total_steps)
+        win_rate, evaluate_reward = evaluate_policy_mappo(eval_env, agent_num, agent_n, Config.episode_limit, turns=32)
+        writer.add_scalar(f'win_rate', win_rate, global_step=total_steps)
+        writer.add_scalar(f'ep_r', evaluate_reward, global_step=total_steps)
         evaluate_num += 1
 
-    obs_n = env.reset()
-    env_seed += 1
+
     done = False
+    env.reset()
     for _ in range(Config.episode_limit):
         if done: break
+        obs_n = env.get_obs()  # obs_n.shape=(N,obs_dim)
+        state = env.get_state()  # s.shape=(state_dim,)
+        avail_a_n = env.get_avail_actions()  # Get available actions of N agents, avail_a_n.shape=(N,action_dim)
 
-        action_n = [agent_n[i].take_action(obs_n[i]).astype(np.float32) for i in range(agent_num)]
-        next_obs_n, reward_n, dw_n, _ = env.step(copy.deepcopy(action_n))
-        done = any(dw_n)
-        replaybuffer.store_transition(obs_n, action_n, reward_n, next_obs_n, dw_n)
-        # 当buffer数据的数量超过一定值后进行训练
-        if replaybuffer.current_size > Config.minimal_size \
-        and total_steps % Config.update_every == 0:
-            transitions = replaybuffer.sample()
-            for i in range(agent_num):
-                actor_loss, critic_loss = agent_n[i].update(transitions,agent_n)
-                writer.add_scalar(f'{i}/actor_loss', actor_loss, global_step=total_steps)
-                writer.add_scalar(f'{i}/critic_loss', critic_loss, global_step=total_steps)
-        obs_n = next_obs_n
-        # Decay noise
-        if Config.use_noise_decay and Config.noise > Config.noise_min:
-            Config.noise -= noise_decay
-            for i in range(agent_num):
-                agent_n[i].noise = Config.noise
-        total_steps += 1
+        a_n, logprob_a_n = [agent_n[i].take_action(obs_n[i],avail_a_n[i]).astype(np.float32) for i in range(agent_num)]
+        v_n = agent_n.get_value(state, obs_n)  # Get the state values (V(s)) of N agents
+        r, done, info = env.step(a_n)
+
 
 env.close()

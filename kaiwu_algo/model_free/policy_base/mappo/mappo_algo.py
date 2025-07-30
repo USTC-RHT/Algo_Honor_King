@@ -28,11 +28,6 @@ class Algo(BaseAlgo):
         self.train_step = 0
 
     def learn(self, list_sample_data):
-        """
-        智能体连续地与环境交互,收集到一定步数的长轨迹才停止
-        - list_sample_data是一个长轨迹(Long Trajectory):
-        [(s_0,a_0,r_1,s_1,logprob_a_0,dw_1,done_1),...,(s_{T-1},a_{T-1},r_T,s_T,logprob_a_{T-1},dw_T,done_T)]
-        """
         self.sample_data_check(list_sample_data)    # 检查样本字段是否符合要求
 
         states, actions, rewards, next_states, logprob_actions, dws, dones =\
@@ -114,9 +109,6 @@ class Algo(BaseAlgo):
                 for name, param in self.Critic.named_parameters():
                     if 'weight' in name:
                         critic_loss += self.L2_reg * param.pow(2).sum()
-
-                # print(f'actor_loss:{actor_loss.mean()}')
-                # print(f'critic_loss:{critic_loss}')
 
                 self.actor_optimizer.zero_grad()			# actor梯度清零
                 actor_loss.mean().backward()                # actor反向传播

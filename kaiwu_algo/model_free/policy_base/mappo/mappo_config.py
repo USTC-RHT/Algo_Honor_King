@@ -6,9 +6,9 @@ class Config:
     critic_hidden_layers = (64,64)         # critic各个隐藏层的网络规模
     actor_learning_rate = 1e-4             # actor模型学习率
     critic_learning_rate = 1e-4            # critic模型学习率
-    Max_train_steps = 5e7                  # 最大训练步数
+    Max_train_steps = int(1e6)                  # 最大训练步数
     num_epochs = 10                        # PPO更新的轮数(epoch)
-    batch_size = 64                        # sliced trajectory的长度/批次大小
+    batch_size = 32                        # sliced trajectory的长度/批次大小
     clip_rate = 0.2                        # PPO-截断 PPO-Clip rate
     entropy_coef = 0                       # actor中 entropy loss的系数(熵系数)
     entropy_coef_decay = 0.99              # 熵系数的衰减率

@@ -86,7 +86,7 @@ def evaluate_policy_ppo_continuous(env, agent, turns = 3):
     return int(total_scores/turns)
 
 # 用于 MADDPG 中的策略评估
-'''episode_limit 评估时每一个episode的最大步数'''
+'''episode_limit 表示评估时每一个episode的最大步数'''
 def evaluate_policy_maddpg(env, agent_num, agent_n, turns = 3, episode_limit = 25):
     total_score = [0] * agent_num
     for _ in range(turns):
@@ -102,6 +102,35 @@ def evaluate_policy_maddpg(env, agent_num, agent_n, turns = 3, episode_limit = 2
             if done: break
         total_score = [total_score[i] + episode_reward[i] for i in range(agent_num)]
     return [score / turns for score in total_score]
+
+
+# 用于 MAPPO_SMAC 中的策略评估
+def evaluate_policy_mappo(env, agent_num, agent_n, episode_limit, turns = 32):
+    win_times = 0
+    evaluate_reward = 0
+    for _ in range(turns):    
+        win_tag = False
+        episode_reward = 0
+        env.reset()
+        for _ in range(episode_limit):
+            obs_n = env.get_obs()  # obs_n.shape=(N,obs_dim)
+            avail_a_n = env.get_avail_actions()  # Get available actions of N agents, avail_a_n.shape=(N,action_dim)
+
+            a_n = [agent_n[i].best_action(obs_n[i],avail_a_n[i]).astype(np.float32) for i in range(agent_num)]
+
+            r, done, info = env.step(a_n)
+            win_tag = True if done and 'battle_won' in info and info['battle_won'] else False
+            episode_reward += r
+            if done: break
+        if win_tag: win_times += 1
+        evaluate_reward += episode_reward
+
+    win_rate = win_times / turns
+    evaluate_reward = evaluate_reward / turns
+    return win_rate, evaluate_reward
+
+
+
 
 # 用于 noisy_dqn中的神经网络构造
 class NoisyLinear(nn.Module):
