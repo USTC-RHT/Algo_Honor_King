@@ -105,7 +105,7 @@ def evaluate_policy_maddpg(env, agent_num, agent_n, turns = 3, episode_limit = 2
 
 
 # 用于 MAPPO_SMAC 中的策略评估
-def evaluate_policy_mappo(env, agent_num, agent_n, episode_limit, turns = 32):
+def evaluate_policy_mappo(env, agent_n, episode_limit, turns = 32):
     win_times = 0
     evaluate_reward = 0
     for _ in range(turns):    
@@ -115,8 +115,7 @@ def evaluate_policy_mappo(env, agent_num, agent_n, episode_limit, turns = 32):
         for _ in range(episode_limit):
             obs_n = env.get_obs()  # obs_n.shape=(N,obs_dim)
             avail_a_n = env.get_avail_actions()  # avail_a_n.shape=(N,action_dim)
-            a_n = [agent_n[i].best_action(obs_n[i],avail_a_n[i]) for i in range(agent_num)]
-            a_n = np.array(a_n)
+            a_n = agent_n.best_action(obs_n,avail_a_n)
 
             r, done, info = env.step(a_n)
             win_tag = True if done and 'battle_won' in info and info['battle_won'] else False
@@ -129,6 +128,30 @@ def evaluate_policy_mappo(env, agent_num, agent_n, episode_limit, turns = 32):
     evaluate_reward = evaluate_reward / turns
     return win_rate, evaluate_reward
 
+# 用于 MAPPO_SMAC 中的奖励归一化
+class Normalization:
+    """Normalize data using running mean and standard deviation."""
+    def __init__(self, shape):
+        self.n = 0
+        self.mean = np.zeros(shape)
+        self.S = np.zeros(shape)
+        self.std = np.sqrt(self.S)
+
+    def update(self, x):
+        x = np.array(x)
+        self.n += 1
+        if self.n == 1:
+            self.mean = x
+            self.std = x
+        else:
+            old_mean = self.mean.copy()
+            self.mean = old_mean + (x - old_mean) / self.n
+            self.S = self.S + (x - old_mean) * (x - self.mean)
+            self.std = np.sqrt(self.S / self.n)
+
+    def normalize(self, x):
+        self.update(x)
+        return (x - self.mean) / (self.std + 1e-8)
 
 # 用于 noisy_dqn中的神经网络构造
 class NoisyLinear(nn.Module):

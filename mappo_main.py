@@ -18,7 +18,7 @@ root1 = os.path.abspath(os.path.join(policy_base_dir, "mappo"))
 sys.path.append(root1)
 from mappo_config import Config
 from mappo_agent import Agent, ReplayBuffer
-from common.rl_utils import evaluate_policy_mappo
+from common.rl_utils import evaluate_policy_mappo, Normalization
 
 '''设置随机数种子,提升训练的可复现性'''
 seed = 0
@@ -45,9 +45,7 @@ Config.action_dim_n = [env_info["n_actions"]] * agent_num
 Config.episode_limit = env_info["episode_limit"]
 
 '''初始化智能体与回放池'''
-agent_n = []
-for agent_id in range(agent_num):
-    agent_n.append(Agent(agent_id))
+agent_n = Agent()
 replay_buffer = ReplayBuffer()
 
 '''初始化tensorboard'''
@@ -58,13 +56,15 @@ writer = SummaryWriter(log_dir=logdir)
 
 total_steps = 0
 evaluate_num = -1
+reward_norm = Normalization(shape = 1)
+
 while total_steps < Config.Max_train_steps:
     ''' Eval & Record '''
-    # if total_steps // Config.eval_interval > evaluate_num:
-    #     win_rate, evaluate_reward = evaluate_policy_mappo(eval_env, agent_num, agent_n, Config.episode_limit, turns=32)
-    #     writer.add_scalar(f'win_rate', win_rate, global_step=total_steps)
-    #     writer.add_scalar(f'ep_r', evaluate_reward, global_step=total_steps)
-    #     evaluate_num += 1
+    if total_steps // Config.eval_interval > evaluate_num:
+        win_rate, evaluate_reward = evaluate_policy_mappo(eval_env, agent_n, Config.episode_limit, turns=32)
+        writer.add_scalar(f'win_rate', win_rate, global_step=total_steps)
+        writer.add_scalar(f'ep_r', evaluate_reward, global_step=total_steps)
+        evaluate_num += 1
 
     done = False
     env.reset()
@@ -74,22 +74,32 @@ while total_steps < Config.Max_train_steps:
         state = env.get_state()  # s.shape=(state_dim,)
         avail_a_n = env.get_avail_actions()  # Get available actions of N agents, avail_a_n.shape=(N,action_dim)
 
-        a_list = [agent_n[i].take_action(obs_n[i],avail_a_n[i]) for i in range(agent_num)]
-        a_n, logprob_a_n = map(np.array, zip(*a_list))
+        a_n, logprob_a_n = agent_n.take_action(obs_n,avail_a_n)
         ''' Get the state values (V(s)) of N agents '''
-        v_n = [agent_n[i].get_value(state, obs_n[i]) for i in range(agent_num)]
+        v_n = agent_n.get_value(state, obs_n)
         r, done, info = env.step(a_n)
+        if Config.use_reward_norm:
+            r = reward_norm.normalize(r)
         if done and episode_step + 1 != Config.episode_limit:
             dw = True
         else:
             dw = False
+        total_steps += 1
         ''' Store the transition '''
         replay_buffer.store_transition(episode_step, obs_n, state, v_n, avail_a_n, a_n, logprob_a_n, r, dw)
 
-    # An episode is over, store obs_n, s and avail_a_n in the last step
+
     obs_n = env.get_obs()
     state = env.get_state()
-    v_n = [agent_n[i].get_value(state, obs_n[i]) for i in range(agent_num)]
+    v_n = agent_n.get_value(state, obs_n)
     replay_buffer.store_last_value(episode_step + 1, v_n)
+
+    if replay_buffer.episode_num == Config.batch_size:
+        batch = replay_buffer.get_training_data()
+        actor_loss, critic_loss = agent_n.update(batch,total_steps)
+        print(f'actor_loss:{actor_loss}')
+        print(f'critic_loss:{critic_loss}')
+        replay_buffer.reset_buffer()
+
     
 env.close()
