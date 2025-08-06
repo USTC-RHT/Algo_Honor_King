@@ -9,10 +9,10 @@ from smac.env import StarCraft2Env
 cur_dir = os.path.dirname(__file__)
 root = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
 sys.path.append(root)
-policy_base_dir = os.path.join(root, "model_free", "policy_base")
+value_base_dir = os.path.join(root, "model_free", "value_base")
 
 algo_name = 'mappo'
-root1 = os.path.abspath(os.path.join(policy_base_dir, "mappo"))
+root1 = os.path.abspath(os.path.join(value_base_dir, "mappo"))
 sys.path.append(root1)
 from mappo_config import Config
 from mappo_agent import Agent, ReplayBuffer

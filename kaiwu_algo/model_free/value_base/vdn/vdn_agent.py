@@ -64,63 +64,39 @@ class ReplayBuffer:
         batch['max_episode_len'] = self.max_episode_len
         return batch
     
-# 策略网络构造
-class Actor(torch.nn.Module):
-    def __init__(self, actor_input_dim, hid_shape, action_dim, use_orthogonal_init = True):
-        super(Actor, self).__init__()
+
+
+# 每个智能体的价值网络构造
+class Q_network_RNN(nn.Module):
+    def __init__(self, input_dim, hid_shape, action_dim, use_orthogonal_init = True):
+        super(Q_network_RNN, self).__init__()
         self.rnn_hidden = None
         '''设置激活函数为 ReLU '''
         self.activate_func = nn.ReLU()
-        self.fc1 = nn.Linear(actor_input_dim, hid_shape[0])
+        self.fc1 = nn.Linear(input_dim, hid_shape[0])
         self.rnn = nn.GRUCell(hid_shape[0], hid_shape[1])
-        self.fc2 = nn.Linear(hid_shape[1], action_dim)   
-        ''' 设置正交初始化 '''
+        self.fc2 = nn.Linear(hid_shape[1], action_dim)
         if use_orthogonal_init:
+            print("------use_orthogonal_init------")
             orthogonal_init(self.fc1)
             orthogonal_init(self.rnn)
-            orthogonal_init(self.fc2, gain=0.01)   
-
-    def init_rnn_hidden(self, batch_size):
-        return torch.zeros(1, batch_size, self.hidden_size)
-
-    def forward(self, x, avail_a):
-        x1 = self.activate_func(self.fc1(x))
-        self.rnn_hidden = self.rnn(x1,self.rnn_hidden)
-        logits = self.fc2(self.rnn_hidden)
-        '''Mask the unavailable actions'''
-        logits[avail_a == 0] = -1e10
-        probs = torch.softmax(logits, dim=-1)
-        return probs
-    
-    def transform_sample_data(self, list_sample_data, device):
-        State = []
-        for sample_data in list_sample_data:
-            State.append(sample_data.state)
-            
-        tensor_state = torch.tensor(np.array(State)).to(device)
-        return tensor_state
-
-# 价值网络构造
-class Critic(torch.nn.Module):
-    def __init__(self, critic_input_dim, hid_shape, use_orthogonal_init = True):
-        super(Critic, self).__init__()
-        self.rnn_hidden = None
-        '''设置激活函数为 ReLU '''
-        self.activate_func = nn.ReLU()
-        self.fc1 = nn.Linear(critic_input_dim, hid_shape[0])
-        self.rnn = nn.GRUCell(hid_shape[0], hid_shape[1])
-        self.fc2 = nn.Linear(hid_shape[1], 1)   
-        ''' 设置正交初始化 '''
-        if use_orthogonal_init:
-            orthogonal_init(self.fc1)
-            orthogonal_init(self.rnn)
-            orthogonal_init(self.fc2)    
+            orthogonal_init(self.fc2)
 
     def forward(self, x):
+        ''' When 'choose_action', inputs.shape(N, input_dim)
+        When 'train', inputs.shape(bach_size * N,input_dim) '''
         x1 = self.activate_func(self.fc1(x))
-        self.rnn_hidden = self.rnn(x1,self.rnn_hidden)
-        value = self.fc2(self.rnn_hidden)
-        return value
+        self.rnn_hidden = self.rnn(x1, self.rnn_hidden)
+        Q = self.fc2(self.rnn_hidden)
+        return Q
+
+# VDN的全局价值网络构造   
+class VDN_Net(nn.Module):
+    def __init__(self, ):
+        super(VDN_Net, self).__init__()
+
+    def forward(self, q):
+        return torch.sum(q, dim=-1, keepdim=True)  # (batch_size, max_episode_len, 1)
     
 
 class Agent:
@@ -130,30 +106,25 @@ class Agent:
         self.obs_dim = Config.obs_dim_n[0]
         self.action_dim = Config.action_dim_n[0]
         self.agent_num = Config.agent_num
-        self.actor_hidden_layers = Config.actor_hidden_layers
-        self.critic_hidden_layers = Config.critic_hidden_layers
-        self.actor_learning_rate = Config.actor_learning_rate
-        self.critic_learning_rate = Config.critic_learning_rate
-        self.use_adam_eps = Config.use_adam_eps
-        self.adam_eps = Config.adam_eps
+        self.hidden_layers = Config.hidden_layers
+        self.learning_rate = Config.learning_rate
         self.use_agent_specific = Config.use_agent_specific
         self.use_lr_decay = Config.use_lr_decay
+        self.add_last_action = Config.add_last_action
         self.Max_train_steps = Config.Max_train_steps
-        self.actor_input_dim = self.obs_dim
-        self.critic_input_dim = self.state_dim
-        if self.use_agent_specific:
-            print("------Critic模型输入中增加智能体特有的观测------")
-            self.critic_input_dim += self.obs_dim
+        
+        # Compute the input dimension
+        self.input_dim = self.obs_dim
+        if self.add_last_action:
+            print("------add last action------")
+            self.input_dim += self.action_dim
+        if self.add_agent_id:
+            print("------add agent id------")
+            self.input_dim += self.agent_num
+
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        '''Build Actor and Critic'''
         self.actor = Actor(self.actor_input_dim,self.actor_hidden_layers,self.action_dim).to(self.device)
-        self.critic = Critic(self.critic_input_dim,self.critic_hidden_layers).to(self.device)
-        if self.use_adam_eps:
-            self.actor_optimizer = torch.optim.Adam(params=self.actor.parameters(), lr = self.actor_learning_rate, eps = self.adam_eps)
-            self.critic_optimizer = torch.optim.Adam(params=self.critic.parameters(), lr = self.critic_learning_rate, eps = self.adam_eps)
-        else:
-            self.actor_optimizer = torch.optim.Adam(params=self.actor.parameters(), lr = self.actor_learning_rate)
-            self.critic_optimizer = torch.optim.Adam(params=self.critic.parameters(), lr = self.critic_learning_rate)
+        self.actor_optimizer = torch.optim.Adam(params=self.actor.parameters(), lr = self.actor_learning_rate)
         self.model = [self.actor,self.critic]
         self.optimizer = [self.actor_optimizer,self.critic_optimizer]
         self.algo = Algo(model = self.model, config = Config, optimizer = self.optimizer, device = self.device)
