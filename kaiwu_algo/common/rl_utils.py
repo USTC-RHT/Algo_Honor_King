@@ -105,13 +105,16 @@ def evaluate_policy_maddpg(env, agent_num, agent_n, turns = 3, episode_limit = 2
 
 
 # 用于 MAPPO_SMAC 中的策略评估
-def evaluate_policy_mappo(env, agent_n, episode_limit, turns = 32):
+def evaluate_policy_mappo(env, use_rnn ,agent_n, episode_limit, turns = 32):
     win_times = 0
     evaluate_reward = 0
     for _ in range(turns):    
         win_tag = False
         episode_reward = 0
         env.reset()
+        if use_rnn:
+            agent_n.actor.rnn_hidden = None
+            agent_n.critic.rnn_hidden = None
         for _ in range(episode_limit):
             obs_n = env.get_obs()  # obs_n.shape=(N,obs_dim)
             avail_a_n = env.get_avail_actions()  # avail_a_n.shape=(N,action_dim)

@@ -12,8 +12,9 @@ class Config:
     clip_rate = 0.2                        # PPO-截断 PPO-Clip rate
     entropy_coef = 0.01                    # actor中 entropy loss的系数(熵系数)
     clip_grad_max_norm = 10                # 梯度裁剪的最大梯度上限
-    Advantage_Normal = False               # 是否进行优势的归一化
+    Advantage_Normal = True                # 是否进行优势的归一化
     eval_interval = 1000                   # 评估频率
+    use_rnn = True                         # 神经网络是否使用rnn模块推理训练
     use_agent_specific = True              # 是否在Critic模型输入中增加智能体特有的观测
     use_lr_decay = True                    # 是否对学习率进行衰减
     use_reward_norm = True                 # 是否对奖励进行归一化

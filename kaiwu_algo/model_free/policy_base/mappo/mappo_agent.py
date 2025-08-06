@@ -68,26 +68,25 @@ class ReplayBuffer:
 class Actor(torch.nn.Module):
     def __init__(self, actor_input_dim, hid_shape, action_dim, use_orthogonal_init = True):
         super(Actor, self).__init__()
+        self.rnn_hidden = None
         '''设置激活函数为 ReLU '''
-        activation = nn.ReLU
+        self.activate_func = nn.ReLU()
         self.fc1 = nn.Linear(actor_input_dim, hid_shape[0])
-        self.fc2 = nn.Linear(hid_shape[0], hid_shape[1])
-        self.fc3 = nn.Linear(hid_shape[1], action_dim)
-        self.model = nn.Sequential(
-                    self.fc1,activation(),
-                    self.fc2,activation(),self.fc3)   
-        # ''' 设置正交初始化 '''
-        # if use_orthogonal_init:
-        #     orthogonal_init(self.fc1)
-        #     orthogonal_init(self.fc2)
-        #     orthogonal_init(self.fc3, gain=0.01)   
+        self.rnn = nn.GRUCell(hid_shape[0], hid_shape[1])
+        self.fc2 = nn.Linear(hid_shape[1], action_dim)   
+        ''' 设置正交初始化 '''
+        if use_orthogonal_init:
+            orthogonal_init(self.fc1)
+            orthogonal_init(self.rnn)
+            orthogonal_init(self.fc2, gain=0.01)   
+
+    def init_rnn_hidden(self, batch_size):
+        return torch.zeros(1, batch_size, self.hidden_size)
 
     def forward(self, x, avail_a):
-        if torch.isnan(x).any(): print("input x has NaN")
-        if torch.isinf(x).any(): print("input x has Inf")
-        logits = self.model(x)
-        if torch.isnan(logits).any():
-            print("Logits contain NaN!")
+        x1 = self.activate_func(self.fc1(x))
+        self.rnn_hidden = self.rnn(x1,self.rnn_hidden)
+        logits = self.fc2(self.rnn_hidden)
         '''Mask the unavailable actions'''
         logits[avail_a == 0] = -1e10
         probs = torch.softmax(logits, dim=-1)
@@ -105,34 +104,23 @@ class Actor(torch.nn.Module):
 class Critic(torch.nn.Module):
     def __init__(self, critic_input_dim, hid_shape, use_orthogonal_init = True):
         super(Critic, self).__init__()
-        layers = []
-        '''中心化的动作价值函数:所有智能体要同时给出自己的观测和相应的动作'''
-        layer_shape = [critic_input_dim] + list(hid_shape) + [1]
+        self.rnn_hidden = None
         '''设置激活函数为 ReLU '''
-        activation = nn.ReLU
-        '''Build networks with For loop'''
-        for j in range(len(layer_shape)-1):
-            if j < len(layer_shape) - 2: 
-                layers += [nn.Linear(layer_shape[j], layer_shape[j+1]), activation()]
-            else: 
-                layers += [nn.Linear(layer_shape[j], layer_shape[j+1])]
-        self.Q = nn.Sequential(*layers)   
+        self.activate_func = nn.ReLU()
+        self.fc1 = nn.Linear(critic_input_dim, hid_shape[0])
+        self.rnn = nn.GRUCell(hid_shape[0], hid_shape[1])
+        self.fc2 = nn.Linear(hid_shape[1], 1)   
         ''' 设置正交初始化 '''
         if use_orthogonal_init:
-            for layer in self.Q:
-                if isinstance(layer, nn.Linear):
-                    orthogonal_init(layer)       
+            orthogonal_init(self.fc1)
+            orthogonal_init(self.rnn)
+            orthogonal_init(self.fc2)    
 
     def forward(self, x):
-        return self.Q(x)
-    
-    def transform_sample_data(self, list_sample_data, device):
-        State = []
-        for sample_data in list_sample_data:
-            State.append(sample_data.state)
-            
-        tensor_state = torch.tensor(np.array(State)).to(device)
-        return tensor_state
+        x1 = self.activate_func(self.fc1(x))
+        self.rnn_hidden = self.rnn(x1,self.rnn_hidden)
+        value = self.fc2(self.rnn_hidden)
+        return value
     
 
 class Agent:
@@ -146,6 +134,8 @@ class Agent:
         self.critic_hidden_layers = Config.critic_hidden_layers
         self.actor_learning_rate = Config.actor_learning_rate
         self.critic_learning_rate = Config.critic_learning_rate
+        self.use_adam_eps = Config.use_adam_eps
+        self.adam_eps = Config.adam_eps
         self.use_agent_specific = Config.use_agent_specific
         self.use_lr_decay = Config.use_lr_decay
         self.Max_train_steps = Config.Max_train_steps
@@ -157,9 +147,13 @@ class Agent:
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         '''Build Actor and Critic'''
         self.actor = Actor(self.actor_input_dim,self.actor_hidden_layers,self.action_dim).to(self.device)
-        self.actor_optimizer = torch.optim.Adam(params=self.actor.parameters(), lr = self.actor_learning_rate)
         self.critic = Critic(self.critic_input_dim,self.critic_hidden_layers).to(self.device)
-        self.critic_optimizer = torch.optim.Adam(params=self.critic.parameters(), lr = self.critic_learning_rate)
+        if self.use_adam_eps:
+            self.actor_optimizer = torch.optim.Adam(params=self.actor.parameters(), lr = self.actor_learning_rate, eps = self.adam_eps)
+            self.critic_optimizer = torch.optim.Adam(params=self.critic.parameters(), lr = self.critic_learning_rate, eps = self.adam_eps)
+        else:
+            self.actor_optimizer = torch.optim.Adam(params=self.actor.parameters(), lr = self.actor_learning_rate)
+            self.critic_optimizer = torch.optim.Adam(params=self.critic.parameters(), lr = self.critic_learning_rate)
         self.model = [self.actor,self.critic]
         self.optimizer = [self.actor_optimizer,self.critic_optimizer]
         self.algo = Algo(model = self.model, config = Config, optimizer = self.optimizer, device = self.device)

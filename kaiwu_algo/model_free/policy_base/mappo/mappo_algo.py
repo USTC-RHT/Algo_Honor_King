@@ -10,7 +10,8 @@ class Algo(BaseAlgo):
     def __init__(self, model, config, optimizer=None, device=None, logger=None, monitor=None): 
         self.config = config                             # 配置文件
         self.gamma = config.gamma                        
-        self.lambd = config.lambd                        
+        self.lambd = config.lambd
+        self.agent_num = config.agent_num                        
         self.num_epochs = config.num_epochs
         self.batch_size = config.batch_size
         self.mini_batch_size = config.mini_batch_size
@@ -18,14 +19,13 @@ class Algo(BaseAlgo):
         self.entropy_coef = config.entropy_coef
         self.clip_grad_max_norm = config.clip_grad_max_norm
         self.Advantage_Normal = config.Advantage_Normal
+        self.use_rnn = config.use_rnn
         self.use_agent_specific = config.use_agent_specific
         self.device = device
         self.Actor = model[0].to(self.device)
         self.Critic = model[1].to(self.device)
         self.actor_optimizer = optimizer[0]
         self.critic_optimizer = optimizer[1]
-        self.actor_learning_rate = config.actor_learning_rate
-        self.critic_learning_rate = config.critic_learning_rate
         self.train_step = 0
 
     def learn(self, batch):
@@ -55,7 +55,20 @@ class Algo(BaseAlgo):
         for _ in range(self.num_epochs):
             for index in BatchSampler(SequentialSampler(range(self.batch_size)), self.mini_batch_size, False):
                 '''actor loss'''
-                new_prob = self.Actor(batch['obs_n'][index],batch['avail_a_n'][index])
+                if self.use_rnn:
+                    # If use RNN, we need to reset the rnn_hidden of the actor and critic.
+                    self.Actor.rnn_hidden = None
+                    probs_now = []
+                    for t in range(max_episode_len):
+                        # prob.shape=(mini_batch_size*N, action_dim)
+                        prob = self.Actor(batch['obs_n'][index, t].reshape(self.mini_batch_size * self.agent_num, -1),
+                                          batch['avail_a_n'][index, t].reshape(self.mini_batch_size * self.agent_num, -1))
+                        probs_now.append(prob.reshape(self.mini_batch_size, self.agent_num, -1))
+                    # Stack them according to the time (dim=1)
+                    new_prob = torch.stack(probs_now, dim=1)
+                else:
+                    new_prob = self.Actor(batch['obs_n'][index],batch['avail_a_n'][index])
+
                 new_action_dist = Categorical(probs=new_prob)
                 new_logprob_a = new_action_dist.log_prob(batch['a_n'][index])
                 old_logprob_a = batch['logprob_a_n'][index]
@@ -77,13 +90,27 @@ class Algo(BaseAlgo):
                 state = batch['state'][index]
                 state = state.unsqueeze(2).repeat(1, 1, N, 1)
 
+                '''use_agent_specific'''
                 if self.use_agent_specific:
                     obs_n = batch['obs_n'][index]
                     critic_inputs = torch.cat([state, obs_n], dim=-1)
                 else:
                     critic_inputs = state
+
+                '''use_rnn'''
+                if self.use_rnn:
+                    # If use RNN, we need to reset the rnn_hidden of the actor and critic.
+                    self.Critic.rnn_hidden = None
+                    values_now = []
+                    for t in range(max_episode_len):
+                        # v.shape=(mini_batch_size*N,1)
+                        v = self.Critic(critic_inputs[:, t].reshape(self.mini_batch_size * self.agent_num, -1))
+                        values_now.append(v.reshape(self.mini_batch_size, self.agent_num))
+                    values_now = torch.stack(values_now, dim=1).squeeze(dim=-1)
+                else:
+                    values_now = self.Critic(critic_inputs).squeeze(dim=-1)
                 
-                critic_loss = (self.Critic(critic_inputs).squeeze(dim=-1) - TD_target[index]) ** 2
+                critic_loss = (values_now - TD_target[index]) ** 2
                 critic_loss = (critic_loss * batch['active'][index]).sum() / batch['active'][index].sum()
 
                 self.actor_optimizer.zero_grad()	 # actor梯度清零

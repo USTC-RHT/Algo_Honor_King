@@ -1,8 +1,6 @@
 import os
 import sys
 import torch
-import copy
-import numpy as np
 
 '''StarCraft2Env 是一个为多智能体强化学习设计的仿真环境,来源于SMAC(StarCraft Multi-Agent Challenge)。
 它基于暴雪出品的即时战略游戏 StarCraft II,提供多个小规模战斗场景,允许研究多智能体之间的协作、对抗和策略学习。'''
@@ -61,13 +59,16 @@ reward_norm = Normalization(shape = 1)
 while total_steps < Config.Max_train_steps:
     ''' Eval & Record '''
     if total_steps // Config.eval_interval > evaluate_num:
-        win_rate, evaluate_reward = evaluate_policy_mappo(eval_env, agent_n, Config.episode_limit, turns=32)
+        win_rate, evaluate_reward = evaluate_policy_mappo(eval_env, Config.use_rnn, agent_n, Config.episode_limit, turns=32)
         writer.add_scalar(f'win_rate', win_rate, global_step=total_steps)
         writer.add_scalar(f'ep_r', evaluate_reward, global_step=total_steps)
         evaluate_num += 1
 
     done = False
     env.reset()
+    if Config.use_rnn:
+        agent_n.actor.rnn_hidden = None
+        agent_n.critic.rnn_hidden = None
     for episode_step in range(Config.episode_limit):
         if done: break
         obs_n = env.get_obs()  # obs_n.shape=(N,obs_dim)
