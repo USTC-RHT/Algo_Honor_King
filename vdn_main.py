@@ -1,6 +1,7 @@
 import os
 import sys
 import torch
+import numpy as np
 
 '''StarCraft2Env 是一个为多智能体强化学习设计的仿真环境,来源于SMAC(StarCraft Multi-Agent Challenge)。
 它基于暴雪出品的即时战略游戏 StarCraft II,提供多个小规模战斗场景,允许研究多智能体之间的协作、对抗和策略学习。'''
@@ -11,11 +12,11 @@ root = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
 sys.path.append(root)
 value_base_dir = os.path.join(root, "model_free", "value_base")
 
-algo_name = 'mappo'
-root1 = os.path.abspath(os.path.join(value_base_dir, "mappo"))
+algo_name = 'vdn'
+root1 = os.path.abspath(os.path.join(value_base_dir, "vdn"))
 sys.path.append(root1)
-from mappo_config import Config
-from mappo_agent import Agent, ReplayBuffer
+from vdn_config import Config
+from vdn_agent import Agent, ReplayBuffer
 from common.rl_utils import evaluate_policy_mappo, Normalization
 
 '''设置随机数种子,提升训练的可复现性'''
@@ -58,26 +59,24 @@ reward_norm = Normalization(shape = 1)
 
 while total_steps < Config.Max_train_steps:
     ''' Eval & Record '''
-    if total_steps // Config.eval_interval > evaluate_num:
-        win_rate, evaluate_reward = evaluate_policy_mappo(eval_env, Config.use_rnn, agent_n, Config.episode_limit, turns=32)
-        writer.add_scalar(f'win_rate', win_rate, global_step=total_steps)
-        writer.add_scalar(f'ep_r', evaluate_reward, global_step=total_steps)
-        evaluate_num += 1
+    # if total_steps // Config.eval_interval > evaluate_num:
+    #     win_rate, evaluate_reward = evaluate_policy_mappo(eval_env, Config.use_rnn, agent_n, Config.episode_limit, turns=32)
+    #     writer.add_scalar(f'win_rate', win_rate, global_step=total_steps)
+    #     writer.add_scalar(f'ep_r', evaluate_reward, global_step=total_steps)
+    #     evaluate_num += 1
 
     done = False
     env.reset()
     if Config.use_rnn:
-        agent_n.actor.rnn_hidden = None
-        agent_n.critic.rnn_hidden = None
+        agent_n.Q_main.rnn_hidden = None
+    # Last actions of N agents(one-hot)
+    last_onehot_a_n = np.zeros((Config.agent_num, Config.action_dim_n[0]))
     for episode_step in range(Config.episode_limit):
         if done: break
         obs_n = env.get_obs()  # obs_n.shape=(N,obs_dim)
-        state = env.get_state()  # s.shape=(state_dim,)
         avail_a_n = env.get_avail_actions()  # Get available actions of N agents, avail_a_n.shape=(N,action_dim)
 
-        a_n, logprob_a_n = agent_n.take_action(obs_n,avail_a_n)
-        ''' Get the state values (V(s)) of N agents '''
-        v_n = agent_n.get_value(state, obs_n)
+        a_n = agent_n.take_action(obs_n,avail_a_n,last_onehot_a_n)
         r, done, info = env.step(a_n)
         if Config.use_reward_norm:
             r = reward_norm.normalize(r)
@@ -87,13 +86,12 @@ while total_steps < Config.Max_train_steps:
             dw = False
         total_steps += 1
         ''' Store the transition '''
-        replay_buffer.store_transition(episode_step, obs_n, state, v_n, avail_a_n, a_n, logprob_a_n, r, dw)
+        replay_buffer.store_transition(episode_step, obs_n, avail_a_n, a_n, last_onehot_a_n, r, dw)
 
 
     obs_n = env.get_obs()
-    state = env.get_state()
-    v_n = agent_n.get_value(state, obs_n)
-    replay_buffer.store_last_value(episode_step + 1, v_n)
+    avail_a_n = env.get_avail_actions()
+    replay_buffer.store_last_value(episode_step + 1,  obs_n, avail_a_n)
 
     if replay_buffer.episode_num == Config.batch_size:
         batch = replay_buffer.get_training_data()
@@ -102,5 +100,4 @@ while total_steps < Config.Max_train_steps:
         print(f'critic_loss:{critic_loss}')
         replay_buffer.reset_buffer()
 
-    
 env.close()
