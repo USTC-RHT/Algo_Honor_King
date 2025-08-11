@@ -7,3 +7,7 @@ class Config:
     buffer_size = 10000              # 经验回放池的大小
     minimal_size = 500               # 当经验回放池中的数据数量超过minimal_size后,才进行训练
     batch_size = 64                  # 训练需要抽取的经验批次大小
+    ''' 在dqn_main中定义以下变量配置 '''
+    state_dim = 0
+    hidden_dim = 128
+    action_dim = 0

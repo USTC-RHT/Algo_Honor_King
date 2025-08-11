@@ -1,8 +1,6 @@
-from collections import defaultdict
 import gymnasium as gym
 import numpy as np
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 import os
 import sys
 import torch
@@ -65,7 +63,10 @@ torch.cuda.manual_seed(seed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
-agent = Agent(env)
+Config.state_dim = env.observation_space.shape[0]
+Config.action_dim = env.action_space.n
+
+agent = Agent()
 if algo_name == 'prioritized_dqn':
     replaybuffer = PrioritizedReplayBuffer(Config.buffer_size, Config.alpha)
 else:  
@@ -123,7 +124,6 @@ for i in range(10):
                 })
             pbar.update(1)
 print(total_steps)
-
 
 env = gym.make(env_name,render_mode = 'human')
 obs, _ = env.reset()

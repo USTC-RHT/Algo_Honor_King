@@ -11,3 +11,6 @@ class Config:
     batch_size = 256                 # 训练需要抽取的经验批次大小
     hidden_layers = (200,200)        # 各个隐藏层的网络规模
     # target_network_update_freq = 10  # 目标网络更新频率
+    ''' 在dqn_main中定义以下变量配置 '''
+    state_dim = 0
+    action_dim = 0

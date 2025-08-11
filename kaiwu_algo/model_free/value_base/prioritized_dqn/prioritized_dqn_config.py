@@ -11,3 +11,7 @@ class Config:
     beta = 0.4
     prioritized_replay_eps = 1e-6
     eval_interval = 1000             # 评估频率
+    ''' 在dqn_main中定义以下变量配置 '''
+    state_dim = 0
+    hidden_dim = 128
+    action_dim = 0

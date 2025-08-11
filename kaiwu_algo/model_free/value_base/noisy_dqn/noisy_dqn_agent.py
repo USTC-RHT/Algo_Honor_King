@@ -73,12 +73,12 @@ class Noisy_Q_Net(nn.Module):
 
 # 构造智能体       
 class Agent:
-    def __init__(self,env):
+    def __init__(self):
         torch.manual_seed(0)
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        self.state_dim = env.observation_space.shape[0]
+        self.state_dim = Config.state_dim
         self.hidden_layers = Config.hidden_layers
-        self.action_dim = env.action_space.n
+        self.action_dim = Config.action_dim
         self.learning_rate = Config.learning_rate
         self.Q_main = Noisy_Q_Net(self.state_dim,self.hidden_layers,self.action_dim).to(self.device)
         self.Q_target = copy.deepcopy(self.Q_main)
