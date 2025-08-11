@@ -105,7 +105,7 @@ def evaluate_policy_maddpg(env, agent_num, agent_n, turns = 3, episode_limit = 2
 
 
 # 用于 MAPPO_SMAC 中的策略评估
-def evaluate_policy_mappo(env, use_rnn ,agent_n, episode_limit, turns = 32):
+def evaluate_policy_mappo(env, use_rnn, agent_n, episode_limit, turns = 32):
     win_times = 0
     evaluate_reward = 0
     for _ in range(turns):    
@@ -120,6 +120,33 @@ def evaluate_policy_mappo(env, use_rnn ,agent_n, episode_limit, turns = 32):
             avail_a_n = env.get_avail_actions()  # avail_a_n.shape=(N,action_dim)
             a_n = agent_n.best_action(obs_n,avail_a_n)
 
+            r, done, info = env.step(a_n)
+            win_tag = True if done and 'battle_won' in info and info['battle_won'] else False
+            episode_reward += r
+            if done: break
+        if win_tag: win_times += 1
+        evaluate_reward += episode_reward
+
+    win_rate = win_times / turns
+    evaluate_reward = evaluate_reward / turns
+    return win_rate, evaluate_reward
+
+# 用于 VDN_SMAC与 QMIX_SMAC 中的策略评估
+def evaluate_policy_vdn_qmix(env, config, use_rnn, agent_n, episode_limit, turns = 32):
+    win_times = 0
+    evaluate_reward = 0
+    for _ in range(turns):    
+        win_tag = False
+        episode_reward = 0
+        env.reset()
+        if use_rnn:
+            agent_n.Q_main.rnn_hidden = None
+        last_onehot_a_n = np.zeros((config.agent_num, config.action_dim_n[0]))
+        for _ in range(episode_limit):
+            obs_n = env.get_obs()  # obs_n.shape=(N,obs_dim)
+            avail_a_n = env.get_avail_actions()  # avail_a_n.shape=(N,action_dim)
+            a_n = agent_n.best_action(obs_n,avail_a_n,last_onehot_a_n)
+            last_onehot_a_n = np.eye(config.action_dim_n[0])[a_n]
             r, done, info = env.step(a_n)
             win_tag = True if done and 'battle_won' in info and info['battle_won'] else False
             episode_reward += r

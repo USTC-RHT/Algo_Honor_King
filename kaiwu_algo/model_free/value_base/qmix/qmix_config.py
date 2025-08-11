@@ -5,7 +5,9 @@ class Config:
     epsilon_decay_steps = 50000            # epsilon衰减到最小值所需步数
     epsilon_min = 0.05                     # epsilon的最小值
     epsilon_decay = (epsilon - epsilon_min) / epsilon_decay_steps # epsilon每步衰减值
-    hidden_layers = (64,64)                # 各个隐藏层的网络规模
+    hidden_layers = (64,64)                # Q_Net各个隐藏层的网络规模
+    qmix_hidden_dim = 32                   # QMIX_Net隐藏层的规模
+    hyper_hidden_dim = 64                  # QMIX_Net中 hypernetwork的隐藏层规模
     learning_rate = 5e-4                   # 模型学习率
     Max_train_steps = int(1e6)             # 最大训练步数
     buffer_size = 5000                     # replay_buffer的容量

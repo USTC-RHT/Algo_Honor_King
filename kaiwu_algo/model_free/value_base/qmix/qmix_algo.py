@@ -20,7 +20,9 @@ class Algo(BaseAlgo):
         self.target_network_update_freq = config.target_network_update_freq
         self.device = device
         self.Q_main = model[0].to(self.device)           # 主神经网络
-        self.Q_target = model[1].to(self.device)         # 目标神经网络  
+        self.Q_target = model[1].to(self.device)         # 目标神经网络
+        self.QMIX_main = model[2].to(self.device)
+        self.QMIX_target = model[3].to(self.device)
         self.optimizer = optimizer                        
         self.train_step = 0
 
@@ -79,10 +81,8 @@ class Algo(BaseAlgo):
         # batch['a_n'].shape(batch_size,max_episode_len, N)
         q_mains = torch.gather(q_mains, dim=-1, index=batch['a_n'].unsqueeze(-1)).squeeze(-1)  # q_evals.shape(batch_size, max_episode_len, N)
 
-
-        q_total_main = torch.sum(q_mains, dim=-1, keepdim=True)
-        q_total_target = torch.sum(q_targets, dim=-1, keepdim=True)
-        # targets.shape=(batch_size,max_episode_len,1)
+        q_total_main = self.QMIX_main(q_mains,batch['state'][:, :-1])
+        q_total_target = self.QMIX_target(q_targets,batch['state'][:, 1:])
         TD_target = batch['r'] + self.gamma * (1 - batch['dw']) * q_total_target
 
         TD_error = (q_total_main - TD_target)
@@ -91,16 +91,20 @@ class Algo(BaseAlgo):
         self.optimizer.zero_grad()
         loss.backward()
         if self.use_grad_clip:
-            torch.nn.utils.clip_grad_norm_(self.Q_main.parameters(), self.clip_grad_max_norm)
+            parameters = list(self.QMIX_main.parameters()) + list(self.Q_main.parameters())
+            torch.nn.utils.clip_grad_norm_(parameters, self.clip_grad_max_norm)
         self.optimizer.step()
 
         if self.use_hard_update:
             # hard update
             if self.train_step % self.target_network_update_freq == 0:
                 self.Q_target.load_state_dict(self.Q_main.state_dict())
+                self.QMIX_target.load_state_dict(self.QMIX_target.state_dict())
         else:
             # Softly update the target networks
             for param, target_param in zip(self.Q_main.parameters(), self.Q_target.parameters()):
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+            for param, target_param in zip(self.QMIX_main.parameters(), self.QMIX_target.parameters()):
                 target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
 
         self.train_step += 1		# 更新计数器

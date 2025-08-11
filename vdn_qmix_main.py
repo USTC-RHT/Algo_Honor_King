@@ -12,12 +12,22 @@ root = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
 sys.path.append(root)
 value_base_dir = os.path.join(root, "model_free", "value_base")
 
-algo_name = 'vdn'
-root1 = os.path.abspath(os.path.join(value_base_dir, "vdn"))
-sys.path.append(root1)
-from vdn_config import Config
-from vdn_agent import Agent, ReplayBuffer
-from common.rl_utils import evaluate_policy_mappo, Normalization
+'''算法名称与环境设置'''
+algo_name = 'qmix'
+env_names = ['3m', '8m', '2s3z']
+env_index = 0
+
+if algo_name == 'vdn':
+    root1 = os.path.abspath(os.path.join(value_base_dir, "vdn"))
+    sys.path.append(root1)
+    from vdn_config import Config
+    from vdn_agent import Agent, ReplayBuffer
+elif algo_name == 'qmix':
+    root1 = os.path.abspath(os.path.join(value_base_dir, "qmix"))
+    sys.path.append(root1)
+    from qmix_config import Config
+    from qmix_agent import Agent, ReplayBuffer
+from common.rl_utils import evaluate_policy_vdn_qmix, Normalization
 
 '''设置随机数种子,提升训练的可复现性'''
 seed = 0
@@ -28,8 +38,6 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 '''初始化多智能体环境'''
-env_names = ['3m', '8m', '2s3z']
-env_index = 0
 env_name = env_names[env_index]
 env = StarCraft2Env(map_name=env_name, seed=seed)
 eval_env = StarCraft2Env(map_name=env_name, seed=seed)
@@ -59,11 +67,11 @@ reward_norm = Normalization(shape = 1)
 
 while total_steps < Config.Max_train_steps:
     ''' Eval & Record '''
-    # if total_steps // Config.eval_interval > evaluate_num:
-    #     win_rate, evaluate_reward = evaluate_policy_mappo(eval_env, Config.use_rnn, agent_n, Config.episode_limit, turns=32)
-    #     writer.add_scalar(f'win_rate', win_rate, global_step=total_steps)
-    #     writer.add_scalar(f'ep_r', evaluate_reward, global_step=total_steps)
-    #     evaluate_num += 1
+    if total_steps // Config.eval_interval > evaluate_num:
+        win_rate, evaluate_reward = evaluate_policy_vdn_qmix(eval_env, Config, Config.use_rnn, agent_n, Config.episode_limit, turns=32)
+        writer.add_scalar(f'win_rate', win_rate, global_step=total_steps)
+        writer.add_scalar(f'ep_r', evaluate_reward, global_step=total_steps)
+        evaluate_num += 1
 
     done = False
     env.reset()
@@ -74,9 +82,11 @@ while total_steps < Config.Max_train_steps:
     for episode_step in range(Config.episode_limit):
         if done: break
         obs_n = env.get_obs()  # obs_n.shape=(N,obs_dim)
+        state = env.get_state()  # s.shape=(state_dim,)
         avail_a_n = env.get_avail_actions()  # Get available actions of N agents, avail_a_n.shape=(N,action_dim)
 
         a_n = agent_n.take_action(obs_n,avail_a_n,last_onehot_a_n)
+        last_onehot_a_n = np.eye(Config.action_dim_n[0])[a_n]
         r, done, info = env.step(a_n)
         if Config.use_reward_norm:
             r = reward_norm.normalize(r)
@@ -86,18 +96,24 @@ while total_steps < Config.Max_train_steps:
             dw = False
         total_steps += 1
         ''' Store the transition '''
-        replay_buffer.store_transition(episode_step, obs_n, avail_a_n, a_n, last_onehot_a_n, r, dw)
-
+        if algo_name == 'vdn':
+            replay_buffer.store_transition(episode_step, obs_n, avail_a_n, a_n, last_onehot_a_n, r, dw)
+        elif algo_name == 'qmix':
+            replay_buffer.store_transition(episode_step, obs_n, state, avail_a_n, a_n, last_onehot_a_n, r, dw)
 
     obs_n = env.get_obs()
+    state = env.get_state()
     avail_a_n = env.get_avail_actions()
-    replay_buffer.store_last_value(episode_step + 1,  obs_n, avail_a_n)
+    if algo_name == 'vdn':
+        replay_buffer.store_last_value(episode_step + 1, obs_n, avail_a_n)
+    elif algo_name == 'qmix':
+        replay_buffer.store_last_value(episode_step + 1, obs_n, state, avail_a_n)
 
-    if replay_buffer.episode_num == Config.batch_size:
-        batch = replay_buffer.get_training_data()
-        actor_loss, critic_loss = agent_n.update(batch,total_steps)
-        print(f'actor_loss:{actor_loss}')
-        print(f'critic_loss:{critic_loss}')
-        replay_buffer.reset_buffer()
+    ''' 样本池超过batch_size时开始训练 '''
+    if replay_buffer.current_size >= Config.batch_size:
+        batch = replay_buffer.sample(Config.batch_size)
+        loss = agent_n.update(batch,total_steps)
+        print(f'loss:{loss}')
+        writer.add_scalar('loss', loss, global_step=total_steps)
 
 env.close()
