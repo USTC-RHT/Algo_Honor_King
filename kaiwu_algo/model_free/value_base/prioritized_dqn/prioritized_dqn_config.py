@@ -10,3 +10,4 @@ class Config:
     alpha = 0.6
     beta = 0.4
     prioritized_replay_eps = 1e-6
+    eval_interval = 1000             # 评估频率

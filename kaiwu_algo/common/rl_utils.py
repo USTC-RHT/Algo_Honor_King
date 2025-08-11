@@ -35,7 +35,7 @@ def reward_shaping(reward, env_name):
     return reward
 
 # 用于 noisy_dqn中的策略评估
-def evaluate_policy(env, agent, turns = 3):
+def evaluate_policy_noisy_dqn(env, agent, turns = 3):
     agent.Q_main.eval() # Take deterministic actions at test time
     total_scores = 0
     for _ in range(turns):
@@ -52,7 +52,7 @@ def evaluate_policy(env, agent, turns = 3):
     return int(total_scores/turns)
 
 # 用于 ppo_discrete、ddpg中的策略评估
-def evaluate_policy(env, agent, turns = 3):
+def evaluate_policy_ppo_discrete_ddpg(env, agent, turns = 3):
     agent.actor.eval() # Take deterministic actions at test time
     total_scores = 0
     for _ in range(turns):

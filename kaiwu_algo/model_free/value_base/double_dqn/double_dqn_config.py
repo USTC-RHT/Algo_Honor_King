@@ -4,6 +4,6 @@ class Config:
     epsilon = 0.01                   # epsilon-贪婪策略中的epsilon参数
     target_network_update_freq = 10  # 目标网络更新频率
     num_episodes = 500               # 智能体在环境中运行的序列的数量
-    buffer_size = 10000
-    minimal_size = 500
-    batch_size = 64
+    buffer_size = 10000              # 经验回放池的大小
+    minimal_size = 500               # 当经验回放池中的数据数量超过minimal_size后,才进行训练
+    batch_size = 64                  # 训练需要抽取的经验批次大小

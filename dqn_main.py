@@ -10,16 +10,16 @@ cur_dir = os.path.dirname(__file__)
 root = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
 sys.path.append(root)
 value_base_dir = os.path.join(root, "model_free", "value_base")
-from common.rl_utils import evaluate_policy
+from common.rl_utils import evaluate_policy_noisy_dqn
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 
 prioritized_replay = False
-# algo_name = 'dqn'
+algo_name = 'dqn'
 # algo_name = 'double_dqn'
 # algo_name = 'dueling_dqn'
 # algo_name = 'prioritized_dqn'
-algo_name = 'noisy_dqn'
+# algo_name = 'noisy_dqn'
 
 if algo_name == 'dqn':
     root1 = os.path.abspath(os.path.join(value_base_dir, "dqn"))
@@ -47,13 +47,14 @@ elif algo_name == 'noisy_dqn':
     sys.path.append(root1)
     from noisy_dqn_config import Config
     from noisy_dqn_agent import Agent,ReplayBuffer
-
+    logdir = f"runs/{algo_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    writer = SummaryWriter(log_dir=logdir)
 
 # env_name = "CliffWalking-v0"    # "FrozenLake-v1"
 # env_name = 'Pendulum-v1'
-# env_name = "CartPole-v0"
+env_name = "CartPole-v0"
 # env_name = "CartPole-v1"
-env_name = 'LunarLander-v3'
+# env_name = 'LunarLander-v3'
 env = gym.make(env_name)
 eval_env = gym.make(env_name)
 # 设置随机数种子,提升训练的可复现性
@@ -69,9 +70,6 @@ if algo_name == 'prioritized_dqn':
     replaybuffer = PrioritizedReplayBuffer(Config.buffer_size, Config.alpha)
 else:  
     replaybuffer = ReplayBuffer(Config.buffer_size)
-
-logdir = f"runs/dqn_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-writer = SummaryWriter(log_dir=logdir)
 
 return_list = []
 total_steps = 0
@@ -103,12 +101,15 @@ for i in range(10):
                         replaybuffer.update_priorities(batch_idxes, new_priorities)
                     else:                    
                         # train 50 times every 50 steps rather than 1 training per step.(Noisy_DQN) 
-                        if total_steps % Config.update_every == 0:
+                        if algo_name == 'noisy_dqn' and total_steps % Config.update_every == 0:
                             for j in range(Config.update_every): 
                                 transitions = replaybuffer.sample(Config.batch_size)
                                 agent.update(transitions)
-                if total_steps % Config.eval_interval == 0:
-                    score = evaluate_policy(eval_env, agent, turns = 20)
+                        else:
+                            transitions = replaybuffer.sample(Config.batch_size)
+                            agent.update(transitions)
+                if algo_name == 'noisy_dqn' and total_steps % Config.eval_interval == 0:
+                    score = evaluate_policy_noisy_dqn(eval_env, agent, turns = 20)
                     writer.add_scalar('ep_r', score, global_step=total_steps)
                 obs = next_obs
                 total_steps += 1
