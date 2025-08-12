@@ -1,2 +1,6 @@
 runs/
 models/
+__pycache__/
+.vscode/
+*.pyc
+*.pyo
