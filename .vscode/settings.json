@@ -1,5 +1,0 @@
-{
-    "python.analysis.extraPaths": [
-        "./AlgoBox/kaiwu_algo/model_free/value_base"
-    ]
-}
