@@ -68,6 +68,7 @@ class Agent:
         self.model = [self.Q_main,self.Q_target]
         self.epsilon = Config.epsilon
         self.optimizer = torch.optim.Adam(params=self.Q_main.parameters(), lr = self.learning_rate)
+        self.algo = Algo(model = self.model, config = Config, optimizer = self.optimizer, device = self.device)
 
     def take_action(self, state):  # epsilon-贪婪策略采取动作
         if np.random.random() < self.epsilon:
@@ -79,13 +80,17 @@ class Agent:
 
     def update(self,transitions):
         list_sample_data = transitions
-        algo = Algo(model = self.model, config = Config, optimizer = self.optimizer, device = self.device)
-        algo.learn(list_sample_data)
+        self.algo.learn(list_sample_data)
+        return
     
     def best_action(self,state):
         state_tensor = torch.tensor(state).to(self.device)
         action = self.Q_main(state_tensor).argmax().item()
         return action
-    
+
+    def max_q_value(self,state):
+        state_tensor = torch.tensor(state).to(self.device)
+        q_max = max(self.Q_main(state_tensor))   
+        return q_max.item()
 
     

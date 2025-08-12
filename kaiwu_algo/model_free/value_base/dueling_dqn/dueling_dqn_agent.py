@@ -49,8 +49,8 @@ class VAnet(torch.nn.Module):
     def forward(self, x):
         A = self.fc_A(F.relu(self.fc1(x)))
         V = self.fc_V(F.relu(self.fc1(x)))
-        # 需要减去Advantage的最大值或均值，否则公式具有不唯一性 Q = V + A
-        # 优势函数只需跟随均值变化，不用频繁补偿最优动作的变化，让优化过程更加稳定
+        ''' 需要减去Advantage的最大值或均值,否则公式具有不唯一性 Q = V + A
+        优势函数只需跟随均值变化，不用频繁补偿最优动作的变化，让优化过程更加稳定 '''
         Q = V + A - A.mean()              # Q值由V值和A值计算得到
         return Q
     
@@ -72,6 +72,7 @@ class Agent:
         self.model = [self.Q_main,self.Q_target]
         self.epsilon = Config.epsilon
         self.optimizer = torch.optim.Adam(params=self.Q_main.parameters(), lr = self.learning_rate)
+        self.algo = Algo(model = self.model, config = Config, optimizer = self.optimizer, device = self.device)
 
     def take_action(self, state):  # epsilon-贪婪策略采取动作
         if np.random.random() < self.epsilon:
@@ -83,13 +84,18 @@ class Agent:
 
     def update(self,transitions):
         list_sample_data = transitions
-        algo = Algo(model = self.model, config = Config, optimizer = self.optimizer, device = self.device)
-        algo.learn(list_sample_data)
+        self.algo.learn(list_sample_data)
+        return
     
     def best_action(self,state):
         state_tensor = torch.tensor(state).to(self.device)
         action = self.Q_main(state_tensor).argmax().item()
         return action
+    
+    def max_q_value(self,state):
+        state_tensor = torch.tensor(state).to(self.device)
+        q_max = max(self.Q_main(state_tensor))   
+        return q_max.item()
     
 
     

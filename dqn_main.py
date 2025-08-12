@@ -4,18 +4,19 @@ from tqdm import tqdm
 import os
 import sys
 import torch
+import matplotlib.pyplot as plt
 cur_dir = os.path.dirname(__file__)
 root = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
 sys.path.append(root)
 value_base_dir = os.path.join(root, "model_free", "value_base")
-from common.rl_utils import evaluate_policy_noisy_dqn
+from common.rl_utils import evaluate_policy_noisy_dqn, moving_average
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 
 prioritized_replay = False
-algo_name = 'dqn'
+# algo_name = 'dqn'
 # algo_name = 'double_dqn'
-# algo_name = 'dueling_dqn'
+algo_name = 'dueling_dqn'
 # algo_name = 'prioritized_dqn'
 # algo_name = 'noisy_dqn'
 
@@ -49,10 +50,11 @@ elif algo_name == 'noisy_dqn':
     writer = SummaryWriter(log_dir=logdir)
 
 # env_name = "CliffWalking-v0"    # "FrozenLake-v1"
-# env_name = 'Pendulum-v1'
-env_name = "CartPole-v0"
+# env_name = "CartPole-v0"
 # env_name = "CartPole-v1"
 # env_name = 'LunarLander-v3'
+env_name = 'Pendulum-v1'
+
 env = gym.make(env_name)
 eval_env = gym.make(env_name)
 # 设置随机数种子,提升训练的可复现性
@@ -63,8 +65,17 @@ torch.cuda.manual_seed(seed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
-Config.state_dim = env.observation_space.shape[0]
-Config.action_dim = env.action_space.n
+if env_name == 'Pendulum-v1':
+    Config.state_dim = env.observation_space.shape[0]
+    Config.action_dim = 11  # 将连续动作分成11个离散动作
+    def dis_to_con(discrete_action, env, action_dim):  # 离散动作转回连续的函数
+        action_lowbound = env.action_space.low[0]  # 连续动作的最小值
+        action_upbound = env.action_space.high[0]  # 连续动作的最大值
+        return action_lowbound + (discrete_action /
+                                (action_dim - 1)) * (action_upbound - action_lowbound)
+else:
+    Config.state_dim = env.observation_space.shape[0]
+    Config.action_dim = env.action_space.n
 
 agent = Agent()
 if algo_name == 'prioritized_dqn':
@@ -73,6 +84,8 @@ else:
     replaybuffer = ReplayBuffer(Config.buffer_size)
 
 return_list = []
+max_q_value_list = []
+max_q_value = 0
 total_steps = 0
 for i in range(10):
     with tqdm(total=int(Config.num_episodes/10),desc='Iteration %d' % i) as pbar:
@@ -89,7 +102,13 @@ for i in range(10):
                     action = env.action_space.sample()
                 else: 
                     action = agent.take_action(obs)
-                next_obs, r, terminated, truncated, _ = env.step(action)
+                if env_name == 'Pendulum-v1':
+                    continuous_action = dis_to_con(action,env,Config.action_dim)
+                    next_obs, r, terminated, truncated, _ = env.step([continuous_action])
+                else:
+                    next_obs, r, terminated, truncated, _ = env.step(action)
+                max_q_value = agent.max_q_value(obs) * 0.005 + max_q_value * 0.995  # 平滑处理
+                max_q_value_list.append(max_q_value)  # 保存每个状态的最大Q值
                 done = terminated or truncated
                 replaybuffer.add(obs, action, r, next_obs, done)
                 episode_return += r 
@@ -125,13 +144,19 @@ for i in range(10):
             pbar.update(1)
 print(total_steps)
 
-env = gym.make(env_name,render_mode = 'human')
-obs, _ = env.reset()
-action = agent.best_action(obs)    
-episode_over = False
-while not episode_over:
-    obs, r, terminated, truncated, _ = env.step(action)
-    next_action = agent.best_action(obs)
-    action = next_action
-    episode_over = terminated or truncated
-env.close()
+episodes_list = list(range(len(return_list)))
+mv_return = moving_average(return_list, 5)
+plt.plot(episodes_list, mv_return)
+plt.xlabel('Episodes')
+plt.ylabel('Returns')
+plt.title(f'{algo_name} on {env_name}')
+plt.show()
+
+frames_list = list(range(len(max_q_value_list)))
+plt.plot(frames_list, max_q_value_list)
+plt.axhline(0, c='orange', ls='--')
+plt.axhline(10, c='red', ls='--')
+plt.xlabel('Frames')
+plt.ylabel('Q value')
+plt.title(f'{algo_name} on {env_name}')
+plt.show()

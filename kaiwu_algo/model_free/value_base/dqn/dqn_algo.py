@@ -37,7 +37,6 @@ class Algo(BaseAlgo):
         loss.backward()													            # 反向传播
         self.optimizer.step()						                                # 更新参数
 
-
         if self.train_step % self.config.target_network_update_freq == 0:
             self.Q_target.load_state_dict(self.Q_main.state_dict())                 # 更新目标网络
         self.train_step += 1                                                        # 更新计数器
@@ -47,9 +46,9 @@ class Algo(BaseAlgo):
 
         actions, rewards, next_states, dones = zip(*[(sample_data.action, sample_data.reward, sample_data.next_state,
                                                       int(sample_data.done)) for sample_data in list_sample_data])
-        rewards = torch.tensor(rewards,device=self.device)
+        rewards = torch.tensor(rewards,dtype=torch.float32,device=self.device)
         next_states = np.array(next_states)
-        next_states_tensor = torch.tensor(next_states,device=self.device)
+        next_states_tensor = torch.tensor(next_states,dtype=torch.float32,device=self.device)
         dones = torch.tensor(dones,device=self.device)
 
         main_q_values = model_output_data[np.arange(len(actions)),actions]
