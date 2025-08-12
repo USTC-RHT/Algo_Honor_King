@@ -13,20 +13,14 @@ sys.path.append(root)
 value_base_dir = os.path.join(root, "model_free", "value_base")
 
 '''算法名称与环境设置'''
-algo_name = 'qmix'
+algo_name = 'vdn'
 env_names = ['3m', '8m', '2s3z']
 env_index = 0
 
-if algo_name == 'vdn':
-    root1 = os.path.abspath(os.path.join(value_base_dir, "vdn"))
-    sys.path.append(root1)
-    from vdn_config import Config
-    from vdn_agent import Agent, ReplayBuffer
-elif algo_name == 'qmix':
-    root1 = os.path.abspath(os.path.join(value_base_dir, "qmix"))
-    sys.path.append(root1)
-    from qmix_config import Config
-    from qmix_agent import Agent, ReplayBuffer
+root1 = os.path.abspath(os.path.join(value_base_dir, "vdn"))
+sys.path.append(root1)
+from vdn_config import Config
+from vdn_agent import Agent, ReplayBuffer
 from common.rl_utils import evaluate_policy_vdn_qmix, Normalization
 
 '''设置随机数种子,提升训练的可复现性'''
@@ -82,7 +76,6 @@ while total_steps < Config.Max_train_steps:
     for episode_step in range(Config.episode_limit):
         if done: break
         obs_n = env.get_obs()  # obs_n.shape=(N,obs_dim)
-        state = env.get_state()  # s.shape=(state_dim,)
         avail_a_n = env.get_avail_actions()  # Get available actions of N agents, avail_a_n.shape=(N,action_dim)
 
         a_n = agent_n.take_action(obs_n,avail_a_n,last_onehot_a_n)
@@ -96,18 +89,11 @@ while total_steps < Config.Max_train_steps:
             dw = False
         total_steps += 1
         ''' Store the transition '''
-        if algo_name == 'vdn':
-            replay_buffer.store_transition(episode_step, obs_n, avail_a_n, a_n, last_onehot_a_n, r, dw)
-        elif algo_name == 'qmix':
-            replay_buffer.store_transition(episode_step, obs_n, state, avail_a_n, a_n, last_onehot_a_n, r, dw)
+        replay_buffer.store_transition(episode_step, obs_n, avail_a_n, a_n, last_onehot_a_n, r, dw)
 
     obs_n = env.get_obs()
-    state = env.get_state()
     avail_a_n = env.get_avail_actions()
-    if algo_name == 'vdn':
-        replay_buffer.store_last_value(episode_step + 1, obs_n, avail_a_n)
-    elif algo_name == 'qmix':
-        replay_buffer.store_last_value(episode_step + 1, obs_n, state, avail_a_n)
+    replay_buffer.store_last_value(episode_step + 1, obs_n, avail_a_n)
 
     ''' 样本池超过batch_size时开始训练 '''
     if replay_buffer.current_size >= Config.batch_size:

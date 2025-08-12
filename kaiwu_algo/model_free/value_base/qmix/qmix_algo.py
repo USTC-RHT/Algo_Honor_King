@@ -1,6 +1,5 @@
 from base_algo import BaseAlgo
 import torch
-from torch import nn
 from torch.utils.data.sampler import *
 
 class Algo(BaseAlgo):
@@ -99,7 +98,7 @@ class Algo(BaseAlgo):
             # hard update
             if self.train_step % self.target_network_update_freq == 0:
                 self.Q_target.load_state_dict(self.Q_main.state_dict())
-                self.QMIX_target.load_state_dict(self.QMIX_target.state_dict())
+                self.QMIX_target.load_state_dict(self.QMIX_main.state_dict())
         else:
             # Softly update the target networks
             for param, target_param in zip(self.Q_main.parameters(), self.Q_target.parameters()):

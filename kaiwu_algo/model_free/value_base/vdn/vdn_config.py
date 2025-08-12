@@ -21,7 +21,7 @@ class Config:
     use_hard_update = True                 # 是否使用硬更新网络方式
     use_grad_clip = True                   # 是否使用梯度裁剪
     target_network_update_freq = 200       # 目标网络更新频率
-    ''' 以下参数均在mappo_main.py中定义 '''
+    ''' 以下参数均在vdn_main.py中定义 '''
     agent_num = 0                          # 智能体的数量
     state_dim = 0                          # 全局状态维度
     obs_dim_n = []                         # 各个智能体 obs的维度列表

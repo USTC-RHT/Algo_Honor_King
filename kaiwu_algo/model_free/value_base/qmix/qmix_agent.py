@@ -2,8 +2,8 @@ import copy
 import torch
 import torch.nn as nn
 import numpy as np
-from vdn_algo import Algo
-from vdn_config import Config
+from qmix_algo import Algo
+from qmix_config import Config
 from common.rl_utils import orthogonal_init
 import torch.nn.functional as F
 
@@ -176,7 +176,7 @@ class Agent:
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.Q_main = Q_Net(self.input_dim,self.hidden_layers,self.action_dim).to(self.device)
         self.Q_target = copy.deepcopy(self.Q_main)
-        self.QMIX_main = QMIX_Net(self.input_dim,self.hidden_layers,self.action_dim).to(self.device)
+        self.QMIX_main = QMIX_Net().to(self.device)
         self.QMIX_target = copy.deepcopy(self.QMIX_main)
         self.model = [self.Q_main,self.Q_target,self.QMIX_main,self.QMIX_target]
         self.parameters = list(self.QMIX_main.parameters()) + list(self.Q_main.parameters())
