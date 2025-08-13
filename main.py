@@ -64,7 +64,7 @@ for i in range(10):
             done = False
             Episode = []
             while not done:
-                action = agent.take_action(obs)
+                action = agent.predict(obs)
                 next_obs, r, dw, truncated, _ = env.step(action)
                 done = dw or truncated
                 episode_return += r 
@@ -72,15 +72,15 @@ for i in range(10):
                 if algo_name in ['monte_carlo','reinforce']:
                     Episode.append((obs,action,r))      
                 elif algo_name == 'sarsa':
-                    next_action = agent.take_action(next_obs)
-                    agent.update(obs,action,r,next_obs,next_action,done)                
+                    next_action = agent.predict(next_obs)
+                    agent.learn(obs,action,r,next_obs,next_action,done)                
                 elif algo_name == 'q_learning':
-                    agent.update(obs,action,r,next_obs,done)
+                    agent.learn(obs,action,r,next_obs,done)
                 elif algo_name == 'a2c':
                     Episode.append((obs,action,r,next_obs,dw))
                 obs = next_obs
             if algo_name in ['monte_carlo','reinforce','a2c']:
-                agent.update(Episode)
+                agent.learn(Episode)
             return_list.append(episode_return)
             if (i_episode + 1) % 10 == 0:
                 pbar.set_postfix({
@@ -110,11 +110,11 @@ plt.show()
 
 env = gym.make(env_name,render_mode = 'human')
 obs, _ = env.reset()
-action = agent.best_action(obs)    
+action = agent.exploit(obs)    
 episode_over = False
 while not episode_over:
     obs, r, terminated, truncated, _ = env.step(action)
-    next_action = agent.best_action(obs)
+    next_action = agent.exploit(obs)
     action = next_action
     episode_over = terminated or truncated
 env.close()

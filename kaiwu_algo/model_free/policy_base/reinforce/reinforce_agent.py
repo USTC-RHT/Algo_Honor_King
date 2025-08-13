@@ -39,20 +39,21 @@ class Agent:
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.model = PolicyNet(self.state_dim,self.hidden_dim,self.action_dim).to(self.device)
         self.optimizer = torch.optim.Adam(params=self.model.parameters(), lr = self.learning_rate)
+        self.algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
 
-    def take_action(self,state):
+    def predict(self,state):
         s = torch.tensor(state).view(1, self.state_dim).to(self.device)
         action_dist = torch.distributions.Categorical(self.model(s))
         action = action_dist.sample()
         return action.item()
 
-    def update(self,Episode):
+    def learn(self,Episode):
         # 创建一个 Data 实例
         list_sample_data = [SampleData(state=obs, action=action, reward=r) for (obs,action,r) in Episode]
-        algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
-        algo.learn(list_sample_data)
+        self.algo.learn(list_sample_data)
+        return
     
-    def best_action(self,state):
+    def exploit(self,state):
         s = torch.tensor(state).view(1, self.state_dim).to(self.device)
         action = np.argmax(self.model(s).detach().cpu().numpy())
         return action

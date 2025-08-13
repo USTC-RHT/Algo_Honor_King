@@ -16,15 +16,6 @@ class Algo(BaseAlgo):
         self.train_step = 0
 
     def learn(self, list_sample_data, weights):
-        """
-        Deep Q-learning(DQN)
-        - list_sample_data是从回放池中采样得到的样本集合(batch):{(s,a,r,s')} -> 以列表形式
-        - 用目标网络(target network)计算目标值: target_q_value = r + gamma * max q(s',a',w_T)
-        其中：
-        r 表示R(s,a),即在状态s下采取动作a所获得的奖励
-        gamma 是折扣因子, 用于平衡当前奖励和未来奖励的重要性
-        max q(s',a',w_T) 表示在新状态s'下采取所有可能动作a'的最大Q值,用目标网络w_T计算
-        """
         self.weights = torch.tensor(weights).to(self.device).to(torch.float64)
         self.sample_data_check(list_sample_data)    # 检查样本字段是否符合要求
 

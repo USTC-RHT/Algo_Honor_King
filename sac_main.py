@@ -73,13 +73,13 @@ while total_steps < Config.Max_train_steps:
                 action = env.action_space.sample()
                 a = action / max_action
             else: 
-                a, _ = agent.take_action(state)
+                a, _ = agent.predict(state)
                 action = a * max_action
         elif algo_name == 'sac_discrete':
             if total_steps < Config.random_steps: 
                 action = env.action_space.sample()
             else: 
-                action = agent.take_action(state)
+                action = agent.predict(state)
             a = action
         next_state, reward, dw, truncated, _ = env.step(action)
         reward = reward_shaping(reward, env_name)
@@ -89,7 +89,7 @@ while total_steps < Config.Max_train_steps:
         if total_steps >= 2 * max_ep_steps and total_steps % Config.update_every == 0:
             for _ in range(Config.update_every):
                 transitions = replaybuffer.sample(Config.batch_size)
-                actor_loss, critic_loss = agent.update(transitions)
+                actor_loss, critic_loss = agent.learn(transitions)
             writer.add_scalar('actor_loss', actor_loss, global_step=total_steps)
             writer.add_scalar('critic_loss', critic_loss, global_step=total_steps)
         state = next_state
@@ -106,11 +106,11 @@ torch.save({'actor': agent.actor.state_dict(),
 
 env = gym.make(env_name,render_mode = 'human')
 state, _ = env.reset()
-action = agent.best_action(state)    
+action = agent.exploit(state)    
 done = False
 while not done:
     state, r, terminated, truncated, _ = env.step(action)
-    next_action = agent.best_action(state)
+    next_action = agent.exploit(state)
     action = next_action
     done = terminated or truncated
 env.close()

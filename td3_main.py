@@ -58,7 +58,7 @@ while total_steps < Config.Max_train_steps:
             # steps for random policy to explore 随机探索阶段
             action = env.action_space.sample()
         else: 
-            action = agent.take_action(state)
+            action = agent.predict(state)
         next_state, reward, dw, truncated, _ = env.step(action)
         reward = reward_shaping(reward, env_name)
         done = dw or truncated
@@ -69,7 +69,7 @@ while total_steps < Config.Max_train_steps:
             critic_loss = None
             for _ in range(Config.update_every):
                 transitions = replaybuffer.sample(Config.batch_size)
-                a_loss, c_loss = agent.update(transitions)
+                a_loss, c_loss = agent.learn(transitions)
                 if actor_loss is None:
                     actor_loss = a_loss
                     critic_loss = c_loss
@@ -91,11 +91,11 @@ torch.save({'actor': agent.actor.state_dict(),
 
 env = gym.make(env_name,render_mode = 'human')
 state, _ = env.reset()
-action = agent.best_action(state)    
+action = agent.exploit(state)    
 done = False
 while not done:
     state, r, terminated, truncated, _ = env.step(action)
-    next_action = agent.best_action(state)
+    next_action = agent.exploit(state)
     action = next_action
     done = terminated or truncated
 env.close()

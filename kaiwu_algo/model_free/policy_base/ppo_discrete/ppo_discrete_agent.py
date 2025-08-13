@@ -93,7 +93,7 @@ class Agent:
         self.algo = Algo(model = self.model, config = Config, optimizer = self.optimizer, device = self.device)
 
 
-    def take_action(self,state):
+    def predict(self,state):
         s = torch.tensor(state).view(1, self.state_dim).to(self.device)
         # 推理得到的结果已经是概率分布
         with torch.no_grad():
@@ -102,11 +102,11 @@ class Agent:
         action = action_dist.sample()
         return action.item(), probs
 
-    def update(self,Long_Traj):
+    def learn(self,Long_Traj):
         actor_loss, critic_loss = self.algo.learn(Long_Traj)
         return actor_loss, critic_loss
     
-    def best_action(self,state):
+    def exploit(self,state):
         with torch.no_grad():
             s = torch.tensor(state).view(1, self.state_dim).to(self.device)
             action = np.argmax(self.actor(s).detach().cpu().numpy())

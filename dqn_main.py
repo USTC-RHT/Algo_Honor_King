@@ -9,16 +9,22 @@ cur_dir = os.path.dirname(__file__)
 root = os.path.abspath(os.path.join(cur_dir, "kaiwu_algo"))
 sys.path.append(root)
 value_base_dir = os.path.join(root, "model_free", "value_base")
-from common.rl_utils import evaluate_policy_noisy_dqn, moving_average
+from common.rl_utils import evaluate_policy_dqn, moving_average
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 
 prioritized_replay = False
 # algo_name = 'dqn'
 # algo_name = 'double_dqn'
-algo_name = 'dueling_dqn'
-# algo_name = 'prioritized_dqn'
+# algo_name = 'dueling_dqn'
+algo_name = 'prioritized_dqn'
 # algo_name = 'noisy_dqn'
+
+# env_name = "CliffWalking-v0"    # "FrozenLake-v1"
+# env_name = "CartPole-v0"
+env_name = "CartPole-v1"
+# env_name = 'LunarLander-v3'
+# env_name = 'Pendulum-v1'
 
 if algo_name == 'dqn':
     root1 = os.path.abspath(os.path.join(value_base_dir, "dqn"))
@@ -40,20 +46,16 @@ elif algo_name == 'prioritized_dqn':
     sys.path.append(root1)
     from prioritized_dqn_config import Config
     from prioritized_dqn_agent import Agent,PrioritizedReplayBuffer
+    logdir = f"runs/{algo_name}_{env_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    writer = SummaryWriter(log_dir=logdir)
     prioritized_replay = True
 elif algo_name == 'noisy_dqn':
     root1 = os.path.abspath(os.path.join(value_base_dir, "noisy_dqn"))
     sys.path.append(root1)
     from noisy_dqn_config import Config
     from noisy_dqn_agent import Agent,ReplayBuffer
-    logdir = f"runs/{algo_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    logdir = f"runs/{algo_name}_{env_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     writer = SummaryWriter(log_dir=logdir)
-
-# env_name = "CliffWalking-v0"    # "FrozenLake-v1"
-# env_name = "CartPole-v0"
-# env_name = "CartPole-v1"
-# env_name = 'LunarLander-v3'
-env_name = 'Pendulum-v1'
 
 env = gym.make(env_name)
 eval_env = gym.make(env_name)
@@ -67,7 +69,7 @@ torch.backends.cudnn.benchmark = False
 
 if env_name == 'Pendulum-v1':
     Config.state_dim = env.observation_space.shape[0]
-    Config.action_dim = 11  # 将连续动作分成11个离散动作
+    Config.action_dim = 25  # 将连续动作分成离散动作的维度
     def dis_to_con(discrete_action, env, action_dim):  # 离散动作转回连续的函数
         action_lowbound = env.action_space.low[0]  # 连续动作的最小值
         action_upbound = env.action_space.high[0]  # 连续动作的最大值
@@ -97,18 +99,18 @@ for i in range(10):
             done = False
             Episode = []
             while not done:
-                if algo_name == 'noisy_dqn' and total_steps < Config.minimal_size: 
+                if algo_name in ['prioritized_dqn','noisy_dqn'] and total_steps < Config.minimal_size: 
                     # steps for random policy to explore 随机探索阶段
                     action = env.action_space.sample()
                 else: 
-                    action = agent.take_action(obs)
+                    action = agent.predict(obs)
                 if env_name == 'Pendulum-v1':
                     continuous_action = dis_to_con(action,env,Config.action_dim)
                     next_obs, r, terminated, truncated, _ = env.step([continuous_action])
                 else:
                     next_obs, r, terminated, truncated, _ = env.step(action)
-                max_q_value = agent.max_q_value(obs) * 0.005 + max_q_value * 0.995  # 平滑处理
-                max_q_value_list.append(max_q_value)  # 保存每个状态的最大Q值
+                ''' max_q_value = agent.max_q_value(obs) * 0.005 + max_q_value * 0.995  # 平滑处理
+                max_q_value_list.append(max_q_value)  # 保存每个状态的最大Q值 '''
                 done = terminated or truncated
                 replaybuffer.add(obs, action, r, next_obs, done)
                 episode_return += r 
@@ -116,7 +118,7 @@ for i in range(10):
                 if replaybuffer.size() > Config.minimal_size:
                     if prioritized_replay:
                         transitions, weights, batch_idxes = replaybuffer.sample(Config.batch_size, beta=Config.beta)
-                        td_errors = agent.update(transitions, weights)
+                        td_errors = agent.learn(transitions, weights)
                         new_priorities = np.abs(td_errors) + Config.prioritized_replay_eps
                         replaybuffer.update_priorities(batch_idxes, new_priorities)
                     else:                    
@@ -124,12 +126,12 @@ for i in range(10):
                         if algo_name == 'noisy_dqn' and total_steps % Config.update_every == 0:
                             for j in range(Config.update_every): 
                                 transitions = replaybuffer.sample(Config.batch_size)
-                                agent.update(transitions)
+                                agent.learn(transitions)
                         else:
                             transitions = replaybuffer.sample(Config.batch_size)
-                            agent.update(transitions)
-                if algo_name == 'noisy_dqn' and total_steps % Config.eval_interval == 0:
-                    score = evaluate_policy_noisy_dqn(eval_env, agent, turns = 20)
+                            agent.learn(transitions)
+                if algo_name in ['prioritized_dqn','noisy_dqn'] and total_steps % Config.eval_interval == 0:
+                    score = evaluate_policy_dqn(eval_env, agent, turns = 20)
                     writer.add_scalar('ep_r', score, global_step=total_steps)
                 obs = next_obs
                 total_steps += 1
@@ -152,6 +154,7 @@ plt.ylabel('Returns')
 plt.title(f'{algo_name} on {env_name}')
 plt.show()
 
+'''
 frames_list = list(range(len(max_q_value_list)))
 plt.plot(frames_list, max_q_value_list)
 plt.axhline(0, c='orange', ls='--')
@@ -160,3 +163,4 @@ plt.xlabel('Frames')
 plt.ylabel('Q value')
 plt.title(f'{algo_name} on {env_name}')
 plt.show()
+'''

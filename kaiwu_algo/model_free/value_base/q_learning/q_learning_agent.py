@@ -25,21 +25,22 @@ class Agent:
         self.action_size = action_size
         self.epsilon = Config.epsilon
         self.Q_table = np.ones([self.state_size, self.action_size])
+        self.algo = Algo(self.Q_table,Config)
 
-    def take_action(self,state):
+    def predict(self,state):
         if np.random.random() < self.epsilon:
             action = np.random.randint(self.action_size)
         else:
             action = np.argmax(self.Q_table[state])
         return action
 
-    def update(self,obs,action,r,next_obs,done):
+    def learn(self,obs,action,r,next_obs,done):
         # 创建一个 Data 实例
         list_sample_data = [Data(state=obs, action=action, reward=r, next_state=next_obs, done=done)]
-        algo = Algo(self.Q_table,Config)
-        algo.learn(list_sample_data)
+        self.algo.learn(list_sample_data)
+        return
     
-    def best_action(self,state):
+    def exploit(self,state):
         return np.argmax(self.Q_table[state])
     
 

@@ -65,7 +65,7 @@ while total_steps < Config.Max_train_steps:
     for _ in range(Config.episode_limit):
         if done: break
 
-        action_n = [agent_n[i].take_action(obs_n[i]).astype(np.float32) for i in range(agent_num)]
+        action_n = [agent_n[i].predict(obs_n[i]).astype(np.float32) for i in range(agent_num)]
         next_obs_n, reward_n, dw_n, _ = env.step(copy.deepcopy(action_n))
         done = any(dw_n)
         replaybuffer.store_transition(obs_n, action_n, reward_n, next_obs_n, dw_n)
@@ -81,7 +81,7 @@ while total_steps < Config.Max_train_steps:
         and total_steps % Config.update_every == 0:
             transitions = replaybuffer.sample()
             for i in range(agent_num):
-                actor_loss, critic_loss = agent_n[i].update(transitions,agent_n)
+                actor_loss, critic_loss = agent_n[i].learn(transitions,agent_n)
                 writer.add_scalar(f'{i}/actor_loss', actor_loss, global_step=total_steps)
                 writer.add_scalar(f'{i}/critic_loss', critic_loss, global_step=total_steps)
 

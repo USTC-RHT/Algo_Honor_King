@@ -9,8 +9,6 @@ class Algo(BaseAlgo):
         self.learning_rate = config.learning_rate        # 学习率
         self.Q = model              # 在这里模型 model代表 Q值表（二维矩阵,两个维度分别对应状态和动作)，在智能体中定义
         
-
-
     def learn(self, list_sample_data):
         """
         使用给定的数据更新Q表格:

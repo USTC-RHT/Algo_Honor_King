@@ -158,7 +158,7 @@ class Agent:
         self.optimizer = [self.actor_optimizer,self.critic_optimizer]
         self.algo = Algo(model = self.model, config = Config, optimizer = self.optimizer, device = self.device)
 
-    def take_action(self,obs,avail_a):
+    def predict(self,obs,avail_a):
         with torch.no_grad():
             obs = torch.tensor(obs).to(self.device)
             avail_a = torch.tensor(avail_a).to(self.device)
@@ -183,7 +183,7 @@ class Agent:
             value = self.critic(critic_input)
             return value.cpu().numpy().squeeze()
 
-    def update(self,batch,total_steps):
+    def laern(self,batch,total_steps):
         actor_loss, critic_loss = self.algo.learn(batch)
         if self.use_lr_decay:
             self.lr_decay(total_steps)
@@ -198,7 +198,7 @@ class Agent:
             param_group['lr'] = self.critic_learning_rate
         return   
     
-    def best_action(self,obs,avail_a):
+    def exploit(self,obs,avail_a):
         with torch.no_grad():
             obs = torch.tensor(obs).to(self.device)
             avail_a = torch.tensor(avail_a).to(self.device)

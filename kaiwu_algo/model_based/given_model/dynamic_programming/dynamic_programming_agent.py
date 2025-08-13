@@ -29,6 +29,7 @@ class Agent:
         self.trans_reward_prob = [[[] for _ in range(self.action_size)] for _ in range(self.state_size)]                # Markov奖励过程奖励转移概率分布 p(r|s,a)
         self.policy = np.ones((self.state_size,self.action_size)) / self.action_size
         self.value = np.zeros(self.state_size)
+        self.algo = Algo([self.trans_state_prob,self.trans_reward_prob,self.policy,self.value],Config)
 
         for i in range(self.state_size):
             for j in range(self.action_size):
@@ -63,14 +64,14 @@ class Agent:
                         self.trans_state_prob[i][j].append(Trans(i - 1,1))
                 
 
-    def take_action(self,state):
+    def predict(self,state):
         return np.argmax(self.policy[state])
 
-    def update(self):
-        algo = Algo([self.trans_state_prob,self.trans_reward_prob,self.policy,self.value],Config)
-        algo.learn()
+    def learn(self):
+        self.algo.learn()
+        return
 
-    def best_action(self,state):
+    def exploit(self,state):
         return np.argmax(self.policy[state])
     
 

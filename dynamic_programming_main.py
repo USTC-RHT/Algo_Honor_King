@@ -22,15 +22,15 @@ env_name = "CliffWalking-v0"    # "FrozenLake-v1"
 env = gym.make(env_name)
 agent = Agent(env_name)
 
-agent.update()
+agent.learn()
 
 env = gym.make(env_name,render_mode = 'human')
 obs, _ = env.reset()
-action = agent.best_action(obs)    
+action = agent.exploit(obs)    
 episode_over = False
 while not episode_over:
     obs, r, terminated, truncated, _ = env.step(action)
-    next_action = agent.best_action(obs)
+    next_action = agent.exploit(obs)
     action = next_action
     episode_over = terminated or truncated
 env.close()

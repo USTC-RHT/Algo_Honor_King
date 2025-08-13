@@ -34,15 +34,15 @@ def reward_shaping(reward, env_name):
         if reward <= -100: reward = -1
     return reward
 
-# 用于 noisy_dqn中的策略评估
-def evaluate_policy_noisy_dqn(env, agent, turns = 3):
+# 用于 prioritized_dqn 与 noisy_dqn中的策略评估
+def evaluate_policy_dqn(env, agent, turns = 3):
     agent.Q_main.eval() # Take deterministic actions at test time
     total_scores = 0
     for _ in range(turns):
         state, _ = env.reset()
         done = False
         while not done:
-            action = agent.take_action(state)
+            action = agent.predict(state)
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
 
@@ -59,7 +59,7 @@ def evaluate_policy_ppo_discrete_ddpg(env, agent, turns = 3):
         state, _ = env.reset()
         done = False
         while not done:
-            action = agent.best_action(state)
+            action = agent.exploit(state)
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
             total_scores += reward
@@ -76,7 +76,7 @@ def evaluate_policy_ppo_continuous(env, agent, turns = 3):
         state, _ = env.reset()
         done = False
         while not done:
-            action = agent.best_action(state)
+            action = agent.exploit(state)
             env_action = 2 * (action - 0.5) * max_action
             next_state, reward, terminated, truncated, _ = env.step(env_action)
             done = terminated or truncated
@@ -93,7 +93,7 @@ def evaluate_policy_maddpg(env, agent_num, agent_n, turns = 3, episode_limit = 2
         obs_n = env.reset()
         episode_reward = [0] * agent_num
         for _ in range(episode_limit):
-            a_n = [agent_n[i].best_action(obs_n[i]).astype(np.float32) for i in range(agent_num)]
+            a_n = [agent_n[i].exploit(obs_n[i]).astype(np.float32) for i in range(agent_num)]
             obs_next_n, reward_n, dw_n, _ = env.step(copy.deepcopy(a_n))
             for i in range(agent_num):
                 episode_reward[i] += reward_n[i]
@@ -118,7 +118,7 @@ def evaluate_policy_mappo(env, use_rnn, agent_n, episode_limit, turns = 32):
         for _ in range(episode_limit):
             obs_n = env.get_obs()  # obs_n.shape=(N,obs_dim)
             avail_a_n = env.get_avail_actions()  # avail_a_n.shape=(N,action_dim)
-            a_n = agent_n.best_action(obs_n,avail_a_n)
+            a_n = agent_n.exploit(obs_n,avail_a_n)
 
             r, done, info = env.step(a_n)
             win_tag = True if done and 'battle_won' in info and info['battle_won'] else False
@@ -145,7 +145,7 @@ def evaluate_policy_vdn_qmix(env, config, use_rnn, agent_n, episode_limit, turns
         for _ in range(episode_limit):
             obs_n = env.get_obs()  # obs_n.shape=(N,obs_dim)
             avail_a_n = env.get_avail_actions()  # avail_a_n.shape=(N,action_dim)
-            a_n = agent_n.best_action(obs_n,avail_a_n,last_onehot_a_n)
+            a_n = agent_n.exploit(obs_n,avail_a_n,last_onehot_a_n)
             last_onehot_a_n = np.eye(config.action_dim_n[0])[a_n]
             r, done, info = env.step(a_n)
             win_tag = True if done and 'battle_won' in info and info['battle_won'] else False
@@ -167,7 +167,7 @@ class Normalization:
         self.S = np.zeros(shape)
         self.std = np.sqrt(self.S)
 
-    def update(self, x):
+    def learn(self, x):
         x = np.array(x)
         self.n += 1
         if self.n == 1:
@@ -180,7 +180,7 @@ class Normalization:
             self.std = np.sqrt(self.S / self.n)
 
     def normalize(self, x):
-        self.update(x)
+        self.learn(x)
         return (x - self.mean) / (self.std + 1e-8)
 
 # 用于 noisy_dqn中的神经网络构造

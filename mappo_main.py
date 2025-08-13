@@ -75,7 +75,7 @@ while total_steps < Config.Max_train_steps:
         state = env.get_state()  # s.shape=(state_dim,)
         avail_a_n = env.get_avail_actions()  # Get available actions of N agents, avail_a_n.shape=(N,action_dim)
 
-        a_n, logprob_a_n = agent_n.take_action(obs_n,avail_a_n)
+        a_n, logprob_a_n = agent_n.predict(obs_n,avail_a_n)
         ''' Get the state values (V(s)) of N agents '''
         v_n = agent_n.get_value(state, obs_n)
         r, done, info = env.step(a_n)
@@ -97,7 +97,7 @@ while total_steps < Config.Max_train_steps:
 
     if replay_buffer.episode_num == Config.batch_size:
         batch = replay_buffer.get_training_data()
-        actor_loss, critic_loss = agent_n.update(batch,total_steps)
+        actor_loss, critic_loss = agent_n.learn(batch,total_steps)
         print(f'actor_loss:{actor_loss}')
         print(f'critic_loss:{critic_loss}')
         replay_buffer.reset_buffer()

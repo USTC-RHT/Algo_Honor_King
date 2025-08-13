@@ -91,8 +91,9 @@ class Agent:
         self.critic_optimizer = torch.optim.Adam(params=self.critic.parameters(), lr = self.critic_learning_rate)
         self.model = [self.actor,self.critic]
         self.optimizer = [self.actor_optimizer,self.critic_optimizer]
+        self.algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
 
-    def take_action(self,state):
+    def predict(self,state):
         s = torch.tensor(state).view(1, self.state_dim).to(self.device)
         # 推理得到的结果已经是概率分布
         with torch.no_grad():
@@ -101,14 +102,13 @@ class Agent:
         action = action_dist.sample()
         return action.item()
 
-    def update(self,Episode):
+    def learn(self,Episode):
         list_sample_data = [SampleData(state=obs, action=action, reward=r, next_state=next_obs, dw=dw) \
                             for (obs,action,r,next_obs,dw) in Episode]
-        algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
-        actor_loss, critic_loss = algo.learn(list_sample_data)
+        actor_loss, critic_loss = self.algo.learn(list_sample_data)
         return actor_loss, critic_loss
     
-    def best_action(self,state):
+    def exploit(self,state):
         with torch.no_grad():
             s = torch.tensor(state).view(1, self.state_dim).to(self.device)
             action = np.argmax(self.actor(s).detach().cpu().numpy())

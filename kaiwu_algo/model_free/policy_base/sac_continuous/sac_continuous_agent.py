@@ -165,18 +165,18 @@ class Agent:
         self.optimizer = [self.actor_optimizer,self.critic_optimizer,self.log_alpha_optimizer]
         self.algo = Algo(model = self.model, config = self.config,  optimizer = self.optimizer, device = self.device)
 
-    def take_action(self,state):
+    def predict(self,state):
         s = torch.tensor(state).view(1, self.state_dim).to(self.device)
         with torch.no_grad():
             a, logp_pi_a = self.actor.sample_act(s)
             action = a.cpu().numpy()[0]
         return action, logp_pi_a
 
-    def update(self,transitions):
+    def learn(self,transitions):
         actor_loss, critic_loss = self.algo.learn(transitions)
         return actor_loss, critic_loss
     
-    def best_action(self,state):
+    def exploit(self,state):
         s = torch.tensor(state).view(1, self.state_dim).to(self.device)
         with torch.no_grad():
             action = self.actor.deterministic_act(s).cpu().numpy()[0]

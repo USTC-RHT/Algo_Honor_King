@@ -48,7 +48,7 @@ while total_steps < Config.Max_train_steps:
             # steps for random policy to explore 随机探索阶段
             action = env.action_space.sample()
         else: 
-            action = agent.take_action(state)
+            action = agent.predict(state)
         next_state, reward, dw, truncated, _ = env.step(action)
         done = dw or truncated
         replaybuffer.add(state, action, reward, next_state, dw)
@@ -56,7 +56,7 @@ while total_steps < Config.Max_train_steps:
         # 当buffer数据的数量超过一定值后进行训练
         if replaybuffer.size() > Config.minimal_size:
             transitions = replaybuffer.sample(Config.batch_size)
-            actor_loss, critic_loss = agent.update(transitions)
+            actor_loss, critic_loss = agent.learn(transitions)
             writer.add_scalar('actor_loss', actor_loss, global_step=total_steps)
             writer.add_scalar('critic_loss', critic_loss, global_step=total_steps)
         state = next_state
@@ -69,11 +69,11 @@ while total_steps < Config.Max_train_steps:
 
 env = gym.make(env_name,render_mode = 'human')
 state, _ = env.reset()
-action = agent.best_action(state)    
+action = agent.exploit(state)    
 done = False
 while not done:
     state, r, terminated, truncated, _ = env.step(action)
-    next_action = agent.best_action(state)
+    next_action = agent.exploit(state)
     action = next_action
     done = terminated or truncated
 env.close()

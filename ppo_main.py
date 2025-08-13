@@ -64,7 +64,7 @@ while total_steps < Config.Max_train_steps:
     '''Interact & trian'''
     while not done:
         '''Interact with Env'''
-        action, logprob_a = agent.take_action(state) # use stochastic when training
+        action, logprob_a = agent.predict(state) # use stochastic when training
         if algo_name == 'ppo_continuous':
             env_action = 2 * (action - 0.5) * max_action
         next_state, reward, dw, truncated, _ = env.step(env_action) # dw: dead&win; tr: truncated
@@ -83,7 +83,7 @@ while total_steps < Config.Max_train_steps:
 
         '''Update if its time'''
         if traj_len % Config.max_traj_len == 0:
-            actor_loss, critic_loss = agent.update(Long_Traj)
+            actor_loss, critic_loss = agent.learn(Long_Traj)
             Long_Traj = []
             traj_len = 0
             writer.add_scalar('actor_loss', actor_loss, global_step=total_steps)
@@ -100,11 +100,11 @@ while total_steps < Config.Max_train_steps:
 
 env = gym.make(env_name,render_mode = 'human')
 obs, _ = env.reset()
-action = agent.best_action(obs)    
+action = agent.exploit(obs)    
 episode_over = False
 while not episode_over:
     obs, r, terminated, truncated, _ = env.step(action)
-    next_action = agent.best_action(obs)
+    next_action = agent.exploit(obs)
     action = next_action
     episode_over = terminated or truncated
 env.close()

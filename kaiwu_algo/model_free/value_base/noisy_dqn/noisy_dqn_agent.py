@@ -87,19 +87,20 @@ class Agent:
         self.model = [self.Q_main,self.Q_target]
         self.epsilon = Config.epsilon
         self.optimizer = torch.optim.Adam(params=self.Q_main.parameters(), lr = self.learning_rate)
+        self.algo = Algo(model = self.model, config = Config, optimizer = self.optimizer, device = self.device)
 
-    def take_action(self, state):  # NoisyNet无需利用 epsilon-贪婪策略采取动作
+    def predict(self, state):  # NoisyNet无需利用 epsilon-贪婪策略采取动作
         with torch.no_grad():
             state_tensor = torch.tensor(state).to(self.device)
             action = self.Q_main(state_tensor).argmax().item()
         return action
 
-    def update(self,transitions):
+    def learn(self,transitions):
         list_sample_data = transitions
-        algo = Algo(model = self.model, config = Config, optimizer = self.optimizer, device = self.device)
-        algo.learn(list_sample_data)
+        self.algo.learn(list_sample_data)
+        return
     
-    def best_action(self,state):
+    def exploit(self,state):
         state_tensor = torch.tensor(state).to(self.device)
         action = self.Q_main(state_tensor).argmax().item()
         return action

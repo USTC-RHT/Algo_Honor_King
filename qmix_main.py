@@ -79,7 +79,7 @@ while total_steps < Config.Max_train_steps:
         state = env.get_state()  # s.shape=(state_dim,)
         avail_a_n = env.get_avail_actions()  # Get available actions of N agents, avail_a_n.shape=(N,action_dim)
 
-        a_n = agent_n.take_action(obs_n,avail_a_n,last_onehot_a_n)
+        a_n = agent_n.predict(obs_n,avail_a_n,last_onehot_a_n)
         last_onehot_a_n = np.eye(Config.action_dim_n[0])[a_n]
         r, done, info = env.step(a_n)
         if Config.use_reward_norm:
@@ -100,7 +100,7 @@ while total_steps < Config.Max_train_steps:
     ''' 样本池超过batch_size时开始训练 '''
     if replay_buffer.current_size >= Config.batch_size:
         batch = replay_buffer.sample(Config.batch_size)
-        loss = agent_n.update(batch,total_steps)
+        loss = agent_n.learn(batch,total_steps)
         print(f'loss:{loss}')
         writer.add_scalar('loss', loss, global_step=total_steps)
 

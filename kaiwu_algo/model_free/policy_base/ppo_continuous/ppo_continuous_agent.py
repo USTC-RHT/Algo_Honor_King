@@ -146,7 +146,7 @@ class Agent:
         self.optimizer = [self.actor_optimizer,self.critic_optimizer]
         self.algo = Algo(model = self.model, config = Config,  optimizer = self.optimizer, device = self.device)
 
-    def take_action(self,state):
+    def predict(self,state):
         # only used when interact with the env
         state = torch.tensor(state, dtype=torch.float32).view(1, self.state_dim).to(self.device)
         with torch.no_grad():
@@ -156,11 +156,11 @@ class Agent:
             logprob_a = dist.log_prob(action).cpu().numpy().flatten()
             return action.cpu().numpy()[0], logprob_a
 
-    def update(self,Long_Traj):
+    def learn(self,Long_Traj):
         actor_loss, critic_loss = self.algo.learn(Long_Traj)
         return actor_loss, critic_loss
     
-    def best_action(self,state): 
+    def exploit(self,state): 
         # only used when evaluate the policy.Making the performance more stable
         state = torch.tensor(state, dtype=torch.float32).view(1, self.state_dim).to(self.device)
         with torch.no_grad():

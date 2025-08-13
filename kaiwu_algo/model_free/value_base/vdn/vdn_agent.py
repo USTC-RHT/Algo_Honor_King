@@ -125,18 +125,18 @@ class Agent:
         self.optimizer = torch.optim.Adam(params=self.Q_main.parameters(), lr = self.learning_rate)
         self.algo = Algo(model = self.model, config = Config, optimizer = self.optimizer, device = self.device)
 
-    def take_action(self,obs_n,avail_a_n,last_onehot_a_n):
+    def predict(self,obs_n,avail_a_n,last_onehot_a_n):
         # obs.shape=(N,obs_dim)
         if np.random.uniform() < self.epsilon:  # epsilon-greedy
             # Only available actions can be chosen
             a_n = [np.random.choice(np.nonzero(avail_a)[0]) for avail_a in avail_a_n]
         else:
-            a_n = self.best_action(obs_n,avail_a_n,last_onehot_a_n)
+            a_n = self.exploit(obs_n,avail_a_n,last_onehot_a_n)
         # epsilon decay
         self.epsilon = max(self.epsilon - Config.epsilon_decay, Config.epsilon_min)
         return a_n
 
-    def update(self,batch,total_steps):
+    def learn(self,batch,total_steps):
         loss = self.algo.learn(batch)
         if self.use_lr_decay:
             self.lr_decay(total_steps)
@@ -148,7 +148,7 @@ class Agent:
             param_group['lr'] = self.learning_rate
         return   
     
-    def best_action(self,obs_n,avail_a_n,last_onehot_a_n):
+    def exploit(self,obs_n,avail_a_n,last_onehot_a_n):
         with torch.no_grad():
             inputs = [torch.tensor(obs_n, dtype=torch.float32)]
             if self.add_last_action:
