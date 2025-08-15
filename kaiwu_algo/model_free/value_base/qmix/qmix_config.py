@@ -12,7 +12,6 @@ class Config:
     Max_train_steps = int(1e6)             # 最大训练步数
     buffer_size = 5000                     # replay_buffer的容量
     batch_size = 32                        # 训练取出的batch大小
-    clip_grad_max_norm = 10                # 梯度裁剪的最大梯度上限
     eval_interval = 1000                   # 评估频率
     use_rnn = True                         # 神经网络是否使用rnn模块推理训练
     use_double_q = True                    # 是否使用double_q_learning(即动作选取与价值评估由两个网络分别实现)
@@ -22,6 +21,7 @@ class Config:
     add_agent_id = True                    # 是否在输入中加入agent_id
     use_hard_update = True                 # 是否使用硬更新网络方式
     use_grad_clip = True                   # 是否使用梯度裁剪
+    clip_grad_max_norm = 10                # 梯度裁剪的最大梯度上限
     target_network_update_freq = 200       # 目标网络更新频率
     ''' 以下参数均在qmix_main.py中定义 '''
     agent_num = 0                          # 智能体的数量

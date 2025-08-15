@@ -3,7 +3,7 @@ class Config:
     gamma = 0.99                     # 折扣因子
     epsilon = 0.01                   # epsilon-贪婪策略中的epsilon参数
     target_network_update_freq = 50  # 目标网络更新频率
-    num_episodes = 8000              # 智能体在环境中运行的序列的数量
+    num_episodes = 1500              # 智能体在环境中运行的序列的数量
     buffer_size = 100000
     minimal_size = 3000
     batch_size = 256

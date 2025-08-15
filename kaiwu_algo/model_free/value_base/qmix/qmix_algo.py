@@ -26,7 +26,10 @@ class Algo(BaseAlgo):
         self.train_step = 0
 
     def learn(self, batch):
-        '''所有agent共享一个动作价值网络,适合'同质'多智能体环境.'''
+        '''实现中心化训练、去中心化执行:训练时可以用全局信息优化团队Q值,执行时每个体只需用自己的观察即可行动。
+           所有agent共享一个动作价值网络,适合'同质'多智能体环境。
+           QMIX: 用一个混合网络(Mixing Network)来实现 Q_total 的计算,
+           混合网络的权重通过超网络(hypernetwork)结合全局信息生成,混合网络接收所有个体Q值为输入。'''
         max_episode_len = batch['max_episode_len']
         for key in batch.keys():
             if key != 'max_episode_len':

@@ -1,7 +1,4 @@
-from collections import defaultdict
 import gymnasium as gym
-import numpy as np
-from tqdm import tqdm
 import os
 import sys
 cur_dir = os.path.dirname(__file__)
@@ -14,11 +11,10 @@ algo_name = 'dynamic_programming'
 if algo_name == 'dynamic_programming':
     root1 = os.path.abspath(os.path.join(model_base_dir, "given_model", "dynamic_programming"))
     sys.path.append(root1)
-    from dynamic_programming_config import Config
     from dynamic_programming_agent import Agent
 
 
-env_name = "CliffWalking-v0"    # "FrozenLake-v1"
+env_name = "CliffWalking-v0"
 env = gym.make(env_name)
 agent = Agent(env_name)
 

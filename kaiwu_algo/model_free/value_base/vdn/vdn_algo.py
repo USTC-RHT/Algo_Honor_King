@@ -1,6 +1,5 @@
 from base_algo import BaseAlgo
 import torch
-from torch import nn
 from torch.utils.data.sampler import *
 
 class Algo(BaseAlgo):
@@ -25,7 +24,9 @@ class Algo(BaseAlgo):
         self.train_step = 0
 
     def learn(self, batch):
-        '''所有agent共享一个动作价值网络,适合'同质'多智能体环境.'''
+        '''实现中心化训练、去中心化执行:训练时可以用全局信息优化团队Q值,执行时每个体只需用自己的观察即可行动。
+           所有agent共享一个动作价值网络,适合'同质'多智能体环境。
+           VDN: 将团队的全局Q值直接线性分解为各个智能体的Q值之和。'''
         max_episode_len = batch['max_episode_len']
         for key in batch.keys():
             if key != 'max_episode_len':

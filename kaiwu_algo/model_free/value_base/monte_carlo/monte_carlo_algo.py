@@ -1,13 +1,14 @@
 from base_algo import BaseAlgo
+import numpy as np
 
 class Algo(BaseAlgo):
     def __init__(self, model, config, optimizer=None, device=None, logger=None, monitor=None): 
         # 离散表格型强化学习算法 不需要神经网络与优化器
         self.config = config                             # 配置文件
         self.gamma = config.gamma                        # 折扣因子
-        self.Q = model[0]                                # 在这里模型 model包含 Q值表与访问次数(visit)表，在智能体中定义
-        self.visit = model[1]                            # Q值表与访问次数表为二维矩阵,两个维度分别对应状态和动作
-
+        self.policy = model[0]                           # 在这里模型 model包含 策略向量，Q值表与访问次数(visit)表，在智能体中定义
+        self.Q = model[1]                                # 策略向量的维度对应状态
+        self.visit = model[2]                            # Q值表与访问次数表为二维矩阵,两个维度分别对应状态和动作
 
     def learn(self, list_sample_data):
         """
@@ -39,6 +40,13 @@ class Algo(BaseAlgo):
                 # 增量式更新 递增均值
                 self.Q[state, action] = self.Q[state, action] + (Return - self.Q[state, action]) / self.visit[state, action]
                 seen_state_action.add((state, action))
+        
+        state_size = self.Q.shape[0]
+        # 更新策略
+        for state in range(state_size):
+            best_action = np.argmax(self.Q[state])
+            self.policy[state] = best_action
+        return
         
     
     def sample_data_check(self,list_sample_data):

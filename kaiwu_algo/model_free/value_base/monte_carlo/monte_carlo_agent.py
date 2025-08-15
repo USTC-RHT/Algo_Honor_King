@@ -22,15 +22,16 @@ class Agent:
         self.state_size = state_size
         self.action_size = action_size
         self.epsilon = Config.epsilon
+        self.policy = np.random.choice(self.action_size, self.state_size)
         self.Q_table = np.zeros([self.state_size, self.action_size])
         self.visit = np.zeros_like(self.Q_table)
-        self.algo = Algo([self.Q_table,self.visit],Config)
+        self.algo = Algo([self.policy,self.Q_table,self.visit],Config)
 
     def predict(self,state):
         if np.random.random() < self.epsilon:
             action = np.random.randint(self.action_size)
         else:
-            action = np.argmax(self.Q_table[state])
+            action = self.policy[state]
         return action
 
     def learn(self,Episode):

@@ -11,11 +11,11 @@ value_base_dir = os.path.join(root, "model_free", "value_base")
 policy_base_dir = os.path.join(root, "model_free", "policy_base")
 from common.rl_utils import moving_average
 
-# algo_name = 'monte_carlo'
+algo_name = 'monte_carlo'
 # algo_name = 'sarsa'
 # algo_name = 'q_learning'
 # algo_name = 'reinforce'
-algo_name = 'a2c'
+# algo_name = 'a2c'
 
 if algo_name == 'monte_carlo':
     root1 = os.path.abspath(os.path.join(value_base_dir, "monte_carlo"))
@@ -44,8 +44,8 @@ if algo_name == 'a2c':
     from a2c_agent import Agent
 
 
-# env_name = "CliffWalking-v0"    # "FrozenLake-v1"
-env_name = "CartPole-v1"
+env_name = "CliffWalking-v1"    # "FrozenLake-v1"
+# env_name = "CartPole-v1"
 # env_name = "Acrobot-v1"
 env = gym.make(env_name)
 if algo_name in ['reinforce','dqn','a2c']:
