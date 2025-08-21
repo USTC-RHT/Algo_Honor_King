@@ -21,7 +21,13 @@ class Algo(BaseAlgo):
         self.train_step = 0
 
     def learn(self, list_sample_data):
-        self.sample_data_check(list_sample_data)    # 检查样本字段是否符合要求
+        """
+        # Input: list_sample_data是一个episode列表:[(s_0,a_0,r_1,s_1,dw_0),...,(s_{T-1},a_{T-1},r_T,s_T,dw_{T-1})]
+
+        # Output: actor_loss, critic_loss
+        """
+        # 检查样本字段是否符合要求
+        self.sample_data_check(list_sample_data)
 
         states, actions, rewards, next_states, dws =\
             zip(*[(sample_data.state, sample_data.action, sample_data.reward, 
@@ -40,9 +46,10 @@ class Algo(BaseAlgo):
             A = TD_target - value
 
             if self.Advantage_Normal:
-                A= (A - A.mean()) / ((A.std() + 1e-4))  #sometimes helps 
+                A= (A - A.mean()) / ((A.std() + 1e-4))  
 
-        self.entropy_coef *= self.entropy_coef_decay     # exploring decay 探索衰减
+        # exploring decay 探索衰减
+        self.entropy_coef *= self.entropy_coef_decay
 
         '''actor loss'''
         probs = self.Actor(state)

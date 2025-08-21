@@ -23,9 +23,12 @@ class Algo(BaseAlgo):
 
     def learn(self, list_sample_data, agent_n, agent_id):
         '''
-        - list_sample_data是从回放池中采样得到的样本集合(batch):
+        # Input: list_sample_data是从回放池中采样得到的样本集合(batch):
         {(obs_n, action_n, reward_n, next_obs_n, dw_n)} -> 以列表形式
         且其中每个元素都是tensor类型,例如:obs_n[i]是维度为[batch_size, obs_dim]的tensor
+
+        # Output: actor_loss, critic_loss
+
         - agent_n是所有智能体的列表
         - agent_id是当前训练的智能体的id
         '''

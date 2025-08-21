@@ -19,7 +19,13 @@ class Algo(BaseAlgo):
         self.train_step = 0
 
     def learn(self, list_sample_data):
-        self.sample_data_check(list_sample_data)    # 检查样本字段是否符合要求
+        """
+        # Input: list_sample_data是从回放池中采样得到的样本集合(batch):{(s,a,r,s',dw)} -> 以列表形式
+
+        # Output: actor_loss, critic_loss
+        """
+        # 检查样本字段是否符合要求
+        self.sample_data_check(list_sample_data)
 
         states, actions, rewards, next_states, dws =\
             zip(*[(sample_data.state, sample_data.action, sample_data.reward, 

@@ -30,6 +30,29 @@ class Algo(BaseAlgo):
            所有agent共享一个动作价值网络,适合'同质'多智能体环境。
            QMIX: 用一个混合网络(Mixing Network)来实现 Q_total 的计算,
            混合网络的权重通过超网络(hypernetwork)结合全局信息生成,混合网络接收所有个体Q值为输入。'''
+        ''' Input: batch是一个字典 
+        包含obs_n、state、avail_a_n、a_n、last_onehot_a_n、r、dw、active、max_episode_len
+        buffer = {'obs_n': np.zeros([self.buffer_size, self.episode_limit + 1, self.N, self.obs_dim]),
+                'state': np.zeros([self.buffer_size, self.episode_limit + 1, self.state_dim]),
+                'avail_a_n': np.ones([self.buffer_size, self.episode_limit + 1, self.N, self.action_dim]),
+                'a_n': np.zeros([self.buffer_size, self.episode_limit, self.N]),
+                'last_onehot_a_n': np.zeros([self.buffer_size, self.episode_limit + 1, self.N, self.action_dim]),
+                'r': np.zeros([self.buffer_size, self.episode_limit, 1]),
+                'dw': np.ones([self.buffer_size, self.episode_limit, 1]),
+                'active': np.zeros([self.buffer_size, self.episode_limit, 1])
+                }
+        
+        obs_n: n个智能体的观测,用于各智能体的策略网络输入,执行时只需局部观测
+        state: 全局状态,用于混合网络输入
+        avail_a_n: 每个智能体可用动作的mask
+        a_n: 每个智能体实际采取的离散动作
+        last_onehot_a_n: 每个智能体上一时间步的onehot动作
+        r: 每个智能体每步获得的奖励
+        dw: 每个智能体每步回合是否终止
+        active: 每个智能体在该时间步是否存在/活跃
+        max_episode_len: 该 batch 中轨迹的最大时间步长度
+
+        Output: 混合网络与动作价值网络的loss之和'''
         max_episode_len = batch['max_episode_len']
         for key in batch.keys():
             if key != 'max_episode_len':
@@ -53,7 +76,8 @@ class Algo(BaseAlgo):
             self.Q_main.rnn_hidden = None
             self.Q_target.rnn_hidden = None
             q_mains, q_targets = [], []
-            for t in range(max_episode_len):  # t=0,1,2,...(episode_len-1)
+            # t=0,1,2,...(episode_len-1)
+            for t in range(max_episode_len):
                 # q_main.shape=(batch_size * N,action_dim)
                 q_main = self.Q_main(inputs[:, t].reshape(-1, input_dim))
                 q_target = self.Q_target(inputs[:, t + 1].reshape(-1, input_dim))
@@ -62,7 +86,7 @@ class Algo(BaseAlgo):
                 q_targets.append(q_target.reshape(self.batch_size, self.agent_num, -1))
 
             # Stack them according to the time (dim=1)
-            # q_evals.shape=(batch_size,max_episode_len,N,action_dim)
+            # q_mains.shape=(batch_size,max_episode_len,N,action_dim)
             q_mains = torch.stack(q_mains, dim=1)
             q_targets = torch.stack(q_targets, dim=1)
         else:
@@ -70,18 +94,24 @@ class Algo(BaseAlgo):
             q_targets = self.Q_target(inputs[:, 1:])
         
         with torch.no_grad():
-            if self.use_double_q:  # If use double q-learning, we use eval_net to choose actions,and use target_net to compute q_target
+            # If use double q-learning, we use main_net to choose actions,and use target_net to compute q_target
+            if self.use_double_q:
                 q_main_last = self.Q_main(inputs[:, -1].reshape(-1, input_dim)).reshape(self.batch_size, 1, self.agent_num, -1)
-                q_mains_next = torch.cat([q_mains[:, 1:], q_main_last], dim=1) # q_evals_next.shape=(batch_size,max_episode_len,N,action_dim)
+                # q_mains_next.shape=(batch_size,max_episode_len,N,action_dim)
+                q_mains_next = torch.cat([q_mains[:, 1:], q_main_last], dim=1) 
                 q_mains_next[batch['avail_a_n'][:, 1:] == 0] = -999999
-                a_argmax = torch.argmax(q_mains_next, dim=-1, keepdim=True)  # a_max.shape=(batch_size,max_episode_len, N, 1)
-                q_targets = torch.gather(q_targets, dim=-1, index=a_argmax).squeeze(-1)  # q_targets.shape=(batch_size, max_episode_len, N)
+                # a_argmax.shape=(batch_size,max_episode_len, N, 1)
+                a_argmax = torch.argmax(q_mains_next, dim=-1, keepdim=True)
+                # q_targets.shape=(batch_size, max_episode_len, N)
+                q_targets = torch.gather(q_targets, dim=-1, index=a_argmax).squeeze(-1)
             else:
                 q_targets[batch['avail_a_n'][:, 1:] == 0] = -999999
-                q_targets = q_targets.max(dim=-1)[0]  # q_targets.shape=(batch_size, max_episode_len, N)
+                # q_targets.shape=(batch_size, max_episode_len, N)
+                q_targets = q_targets.max(dim=-1)[0]  
 
         # batch['a_n'].shape(batch_size,max_episode_len, N)
-        q_mains = torch.gather(q_mains, dim=-1, index=batch['a_n'].unsqueeze(-1)).squeeze(-1)  # q_evals.shape(batch_size, max_episode_len, N)
+        # q_mains.shape(batch_size, max_episode_len, N)
+        q_mains = torch.gather(q_mains, dim=-1, index=batch['a_n'].unsqueeze(-1)).squeeze(-1)
 
         q_total_main = self.QMIX_main(q_mains,batch['state'][:, :-1])
         q_total_target = self.QMIX_target(q_targets,batch['state'][:, 1:])

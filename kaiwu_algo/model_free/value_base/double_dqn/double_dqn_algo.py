@@ -18,12 +18,12 @@ class Algo(BaseAlgo):
     def learn(self, list_sample_data):
         """
         Double Deep Q-learning(Double DQN)
-        - list_sample_data是从回放池中采样得到的样本集合(batch):{(s,a,r,s')} -> 以列表形式
+        - list_sample_data是从回放池中采样得到的样本集合(batch):{(s,a,r,s',done)} -> 以列表形式
         - 用训练网络(main network)选取动作:
         a* = argmax q(s',a',w)
 
         - 用目标网络(target network)计算目标值: 
-        target_q_value = r + gamma * q(s',a*,w_T)
+        target_q_value = r + gamma * max q(s',a',w_T) * (1 - done)
         其中：
         r 表示R(s,a),即在状态s下采取动作a所获得的奖励
         gamma 是折扣因子, 用于平衡当前奖励和未来奖励的重要性

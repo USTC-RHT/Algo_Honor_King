@@ -30,6 +30,31 @@ class Algo(BaseAlgo):
 
     def learn(self, batch):
         '''所有agent共享一个actor网络和一个critic网络,适合'同质'多智能体环境.'''
+        ''' Input: batch是一个字典 
+        包含obs_n、state、v_n、avail_a_n、a_n、logprob_a_n、r、dw、active、max_episode_len
+        batch = {'obs_n': np.zeros([self.batch_size, self.episode_limit, self.N, self.obs_dim]),
+                'state': np.zeros([self.batch_size, self.episode_limit, self.state_dim]),
+                'v_n': np.zeros([self.batch_size, self.episode_limit + 1, self.N]),
+                'avail_a_n': np.ones([self.batch_size, self.episode_limit, self.N, self.action_dim]),
+                'a_n': np.zeros([self.batch_size, self.episode_limit, self.N]),
+                'logprob_a_n': np.zeros([self.batch_size, self.episode_limit, self.N]),
+                'r': np.zeros([self.batch_size, self.episode_limit, self.N]),
+                'dw': np.ones([self.batch_size, self.episode_limit, self.N]),  
+                'active': np.zeros([self.batch_size, self.episode_limit, self.N])}
+                
+        obs_n: n个智能体的观测,用于各智能体的策略网络输入,执行时只需局部观测
+        state: 全局状态,用于中心化值函数(Critic)输入
+        v_n: 每个智能体每个时间步(含终止步 t+1)的价值估计
+        avail_a_n: 每个智能体可用动作的mask
+        a_n: 每个智能体实际采取的离散动作
+        logprob_a_n: 每个智能体每步选到当前动作的对数概率
+        r: 每个智能体每步获得的奖励
+        dw: 每个智能体每步回合是否终止
+        active: 每个智能体在该时间步是否存在/活跃
+        max_episode_len: 该 batch 中轨迹的最大时间步长度
+
+        Output: actor_loss, critic_loss'''
+
         max_episode_len = batch['max_episode_len']
         for key in batch.keys():
             if key != 'max_episode_len':
@@ -72,7 +97,8 @@ class Algo(BaseAlgo):
                 new_action_dist = Categorical(probs=new_prob)
                 new_logprob_a = new_action_dist.log_prob(batch['a_n'][index])
                 old_logprob_a = batch['logprob_a_n'][index]
-                ratio = torch.exp(new_logprob_a - old_logprob_a)  # a/b == exp(log(a)-log(b))
+                # a/b == exp(log(a)-log(b))
+                ratio = torch.exp(new_logprob_a - old_logprob_a)
 
                 surr1 = ratio * A[index]
                 '''PPO-截断(PPO-Clip)'''
@@ -85,7 +111,8 @@ class Algo(BaseAlgo):
                 actor_loss = (actor_loss * batch['active'][index]).sum() / batch['active'][index].sum()
 
                 '''critic loss'''
-                N = batch['obs_n'][index].shape[2]  # 获取 agent的数量 N
+                # 获取 agent的数量 N
+                N = batch['obs_n'][index].shape[2]
                 # 扩展 state 到 [B, T, 1, state_dim] 再 repeat 到 [B, T, N, state_dim]
                 state = batch['state'][index]
                 state = state.unsqueeze(2).repeat(1, 1, N, 1)

@@ -23,6 +23,11 @@ class Algo(BaseAlgo):
         self.delay_count = 0
 
     def learn(self, list_sample_data):
+        """
+        # Input: list_sample_data是从回放池中采样得到的样本集合(batch):{(s,a,r,s',dw)} -> 以列表形式
+
+        # Output: actor_loss, critic_loss
+        """
         self.delay_count += 1
         self.train_step += 1						# 更新计数器
         self.sample_data_check(list_sample_data)    # 检查样本字段是否符合要求

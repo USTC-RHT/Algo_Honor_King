@@ -30,8 +30,10 @@ class Algo(BaseAlgo):
     def learn(self, list_sample_data):
         """
         智能体连续地与环境交互,收集到一定步数的长轨迹才停止
-        - list_sample_data是一个长轨迹(Long Trajectory):
+        # Input: list_sample_data是一个长轨迹(Long Trajectory):
         [(s_0,a_0,r_1,s_1,logprob_a_0,dw_1,done_1),...,(s_{T-1},a_{T-1},r_T,s_T,logprob_a_{T-1},dw_T,done_T)]
+
+        # Output: actor_loss, critic_loss
         """
         self.sample_data_check(list_sample_data)    # 检查样本字段是否符合要求
 
@@ -70,14 +72,15 @@ class Algo(BaseAlgo):
             A = torch.tensor(A).unsqueeze(1).float().to(self.device)
             TD_target = A + value
             if self.Advantage_Normal:
-                A= (A - A.mean()) / ((A.std() + 1e-4))  #sometimes helps 
+                A= (A - A.mean()) / ((A.std() + 1e-4))
 
         '''PPO update'''
         '''Slice long trajectopy into short trajectory and perform mini-batch PPO update'''
         traj_len = dones.shape[0]
         optim_iter_num = int(math.ceil(traj_len / self.batch_size))
 
-        self.entropy_coef *= self.entropy_coef_decay     # exploring decay 探索衰减
+        # exploring decay 探索衰减
+        self.entropy_coef *= self.entropy_coef_decay
         for _ in range(self.num_epochs):
             '''Shuffle the trajectory, Good for training
             perm : short for permutation'''
@@ -96,7 +99,8 @@ class Algo(BaseAlgo):
                 new_prob = self.Actor(state[index])
                 new_prob_a = new_prob.gather(1, action[index])
                 old_prob_a = logprob_a[index].gather(1, action[index])
-                ratio = torch.exp(torch.log(new_prob_a) - torch.log(old_prob_a))  # a/b == exp(log(a)-log(b))
+                # a/b == exp(log(a)-log(b))
+                ratio = torch.exp(torch.log(new_prob_a) - torch.log(old_prob_a))
 
                 surr1 = ratio * A[index]
                 '''PPO-截断(PPO-Clip)'''
@@ -114,9 +118,6 @@ class Algo(BaseAlgo):
                 for name, param in self.Critic.named_parameters():
                     if 'weight' in name:
                         critic_loss += self.L2_reg * param.pow(2).sum()
-
-                # print(f'actor_loss:{actor_loss.mean()}')
-                # print(f'critic_loss:{critic_loss}')
 
                 self.actor_optimizer.zero_grad()			# actor梯度清零
                 actor_loss.mean().backward()                # actor反向传播
