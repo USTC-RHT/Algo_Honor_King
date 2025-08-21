@@ -44,7 +44,7 @@ class Algo(BaseAlgo):
         last_onehot_a_n: 每个智能体上一时间步的onehot动作
         r: 每个智能体每步获得的奖励
         dw: 每个智能体每步回合是否终止
-        active: 每个智能体在该时间步是否存在/活跃
+        active: 每个智能体在该时间步是否为有效数据
         max_episode_len: 该 batch 中轨迹的最大时间步长度
 
         Output: 动作价值网络的loss'''
